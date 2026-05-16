@@ -14,18 +14,20 @@
 .mmm-bambulink .bambu-info {
   display: flex;
   flex-direction: column;
-  font-size: 11px;
+  font-size: 11px;         /* <- ici */
   line-height: 1.4;
 }
 
-.mmm-bambulink .bambu-status-line {
-  font-weight: 600;
-}
-
+.mmm-bambulink .bambu-status-line,
 .mmm-bambulink .bambu-progress-line,
 .mmm-bambulink .bambu-temp-line,
 .mmm-bambulink .bambu-ams-line,
+.mmm-bambulink .bambu-speed-line,
+.mmm-bambulink .bambu-net-line,
+.mmm-bambulink .bambu-chamber-line,
 .mmm-bambulink .bambu-file-line {
+  font-size: 11px;         /* <- et ici pour être sûr que tout suit */
+  line-height: 1.4;
   margin-top: 2px;
 }
 

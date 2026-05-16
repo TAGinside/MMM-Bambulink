@@ -25,27 +25,6 @@ function speedLevelLabel(level) {
   }
 }
 
-// Helper : convertir un code couleur AMS (ex: "D3C5A3FF") en nom lisible
-function amsColorNameFromHex(hex) {
-  if (!hex || typeof hex !== "string") return "";
-
-  // on ignore l'alpha (les 2 derniers caractères), on garde RRGGBB
-  const clean = hex.replace("#", "").toUpperCase();
-  const rgb = clean.substring(0, 6);
-
-  switch (rgb) {
-    case "000000": return "Noir";
-    case "FFFFFF": return "Blanc";
-    case "161616": return "Noir";
-    case "898989": return "Gris";
-    case "D3C5A3": return "Beige";
-    // tu peux ajouter ici d’autres correspondances si tu connais leurs hex
-    // ex: "0000FF" -> "Bleu", "FFFF00" -> "Jaune", etc.
-    default:
-      return ""; // inconnu / non mappé
-  }
-}
-
 Module.register("MMM-Bambulink", {
   // Configuration par défaut
   defaults: {
@@ -145,47 +124,45 @@ Module.register("MMM-Bambulink", {
       info.appendChild(chamberLine);
     }
 
-    // Ligne 5: filament AMS + couleur + humidité + température AMS
-    if (s.ams_tray_now !== undefined || s.ams_humidity !== undefined || s.ams_temp !== undefined) {
-      const amsLine = document.createElement("div");
-      amsLine.className = "bambu-ams-line";
+    // Ligne 5: filament AMS + humidité + température AMS
+if (s.ams_tray_now !== undefined || s.ams_humidity !== undefined || s.ams_temp !== undefined) {
+  const amsLine = document.createElement("div");
+  amsLine.className = "bambu-ams-line";
 
-      const colorName = amsColorNameFromHex(s.ams_tray_color);
-      const slotPart = (s.ams_tray_now !== undefined)
-        ? `Slot ${s.ams_tray_now}: ${s.ams_tray_type || "Inconnu"}`
-        : "AMS";
+  const slotPart = (s.ams_tray_now !== undefined)
+    ? `Slot ${s.ams_tray_now}: ${s.ams_tray_type || "Inconnu"}`
+    : "AMS";
 
-      const colorPart = colorName ? `Couleur: ${colorName}` : "";
-      const humPart = (s.ams_humidity !== undefined)
-        ? `Humidité: ${s.ams_humidity}%`
-        : "";
-      const tempPart = (s.ams_temp !== undefined)
-        ? `Temp: ${s.ams_temp}°C`
-        : "";
+  const humPart = (s.ams_humidity !== undefined)
+    ? `Humidité: ${s.ams_humidity}%`
+    : "";
+  const tempPart = (s.ams_temp !== undefined)
+    ? `Temp: ${s.ams_temp}°C`
+    : "";
 
-      amsLine.innerHTML =
-        `${slotPart}` +
-        (colorPart ? ` – ${colorPart}` : "") +
-        (humPart ? ` – ${humPart}` : "") +
-        (tempPart ? ` – ${tempPart}` : "");
+  // Texte: slot + humidité + température (sans nom de couleur)
+  amsLine.innerHTML =
+    `${slotPart}` +
+    (humPart ? ` – ${humPart}` : "") +
+    (tempPart ? ` – ${tempPart}` : "");
 
-      // Petit carré de couleur à côté du texte AMS
-      if (s.ams_tray_color) {
-        const colorBox = document.createElement("span");
-        colorBox.className = "bambu-ams-color-box";
-        const rgb = s.ams_tray_color.replace("#", "").substring(0, 6);
-        colorBox.style.display = "inline-block";
-        colorBox.style.width = "10px";
-        colorBox.style.height = "10px";
-        colorBox.style.marginLeft = "6px";
-        colorBox.style.backgroundColor = "#" + rgb;
-        colorBox.style.borderRadius = "2px";
-        colorBox.style.border = "1px solid rgba(0, 0, 0, 0.2)";
-        amsLine.appendChild(colorBox);
-      }
+  // Rectangle de couleur à la place du texte de couleur
+  if (s.ams_tray_color) {
+    const colorBox = document.createElement("span");
+    colorBox.className = "bambu-ams-color-box";
+    const rgb = s.ams_tray_color.replace("#", "").substring(0, 6);
+    colorBox.style.display = "inline-block";
+    colorBox.style.width = "18px";
+    colorBox.style.height = "10px";
+    colorBox.style.marginLeft = "6px";
+    colorBox.style.backgroundColor = "#" + rgb;
+    colorBox.style.borderRadius = "2px";
+    colorBox.style.border = "1px solid rgba(0, 0, 0, 0.2)";
+    amsLine.appendChild(colorBox);
+  }
 
-      info.appendChild(amsLine);
-    }
+  info.appendChild(amsLine);
+}
 
     // Ligne 6: vitesse impression
     if (s.speed_mag !== undefined || s.speed_level !== undefined) {
