@@ -62,7 +62,7 @@ Module.register("MMM-Bambulink", {
     wrapper.className = "mmm-bambulink";
 
     if (!this.config.ip || !this.config.accessCode || !this.config.serial) {
-      wrapper.innerHTML = "MMM-B ambulink: configuration incomplète (ip / accessCode / serial).";
+      wrapper.innerHTML = "MMM-Bambulink: configuration incomplète (ip / accessCode / serial).";
       return wrapper;
     }
 
@@ -106,7 +106,17 @@ Module.register("MMM-Bambulink", {
     progressLine.innerHTML = `Progression: ${percent} – Couches: ${layers} – Temps restant: ${remaining}`;
     info.appendChild(progressLine);
 
-    // Ligne 3: températures buse / lit
+    // Ligne 3: vitesse impression
+    if (s.speed_mag !== undefined || s.speed_level !== undefined) {
+      const speedLine = document.createElement("div");
+      speedLine.className = "bambu-speed-line";
+      const mag = (s.speed_mag !== undefined) ? `${s.speed_mag}%` : "N/A";
+      const lvlLabel = speedLevelLabel(s.speed_level);
+      speedLine.innerHTML = `Vitesse: ${mag} (${lvlLabel})`;
+      info.appendChild(speedLine);
+    }
+
+    // Ligne 4: températures buse / lit
     const tempLine = document.createElement("div");
     tempLine.className = "bambu-temp-line";
     const noz = (s.nozzle_temp !== undefined) ? `${s.nozzle_temp}°C` : "N/A";
@@ -116,7 +126,7 @@ Module.register("MMM-Bambulink", {
     tempLine.innerHTML = `Buse: ${noz} (${nozTar}) – Lit: ${bed} (${bedTar})`;
     info.appendChild(tempLine);
 
-    // Ligne 4: température chambre
+    // Ligne 5: température chambre
     if (s.chamber_temp !== undefined) {
       const chamberLine = document.createElement("div");
       chamberLine.className = "bambu-chamber-line";
@@ -124,55 +134,51 @@ Module.register("MMM-Bambulink", {
       info.appendChild(chamberLine);
     }
 
-    // Ligne 5: filament AMS + humidité + température AMS
+    // Ligne 6: filament AMS + couleur + humidité AMS + température AMS
 if (s.ams_tray_now !== undefined || s.ams_humidity !== undefined || s.ams_temp !== undefined) {
   const amsLine = document.createElement("div");
   amsLine.className = "bambu-ams-line";
 
-  const slotPart = (s.ams_tray_now !== undefined)
+  // Texte "Slot 1: Type de filament"
+  const slotSpan = document.createElement("span");
+  slotSpan.textContent = (s.ams_tray_now !== undefined)
     ? `Slot ${s.ams_tray_now}: ${s.ams_tray_type || "Inconnu"}`
     : "AMS";
+  amsLine.appendChild(slotSpan);
 
-  const humPart = (s.ams_humidity !== undefined)
-    ? `Humidité: ${s.ams_humidity}%`
-    : "";
-  const tempPart = (s.ams_temp !== undefined)
-    ? `Temp: ${s.ams_temp}°C`
-    : "";
-
-  // Texte: slot + humidité + température (sans nom de couleur)
-  amsLine.innerHTML =
-    `${slotPart}` +
-    (humPart ? ` – ${humPart}` : "") +
-    (tempPart ? ` – ${tempPart}` : "");
-
-  // Rectangle de couleur à la place du texte de couleur
+  // Rectangle couleur "HEX" si ams_tray_color est défini
   if (s.ams_tray_color) {
     const colorBox = document.createElement("span");
     colorBox.className = "bambu-ams-color-box";
     const rgb = s.ams_tray_color.replace("#", "").substring(0, 6);
+
     colorBox.style.display = "inline-block";
-    colorBox.style.width = "18px";
-    colorBox.style.height = "10px";
-    colorBox.style.marginLeft = "6px";
+    colorBox.style.width = "38px";      // ≈ 1 cm
+    colorBox.style.height = "1.2em";    // hauteur proche de la taille du texte
+    colorBox.style.margin = "0 6px";
     colorBox.style.backgroundColor = "#" + rgb;
-    colorBox.style.borderRadius = "2px";
-    colorBox.style.border = "1px solid rgba(0, 0, 0, 0.2)";
+    colorBox.style.verticalAlign = "middle";
+
     amsLine.appendChild(colorBox);
+  }
+
+  // AMS Humidité + température, après le rectangle
+  const parts = [];
+  if (s.ams_humidity !== undefined) {
+    parts.push(`Humidité: ${s.ams_humidity}%`);
+  }
+  if (s.ams_temp !== undefined) {
+    parts.push(`Temp: ${s.ams_temp}°C`);
+  }
+
+  if (parts.length > 0) {
+    const detailsSpan = document.createElement("span");
+    detailsSpan.textContent = " – " + parts.join(" – ");
+    amsLine.appendChild(detailsSpan);
   }
 
   info.appendChild(amsLine);
 }
-
-    // Ligne 6: vitesse impression
-    if (s.speed_mag !== undefined || s.speed_level !== undefined) {
-      const speedLine = document.createElement("div");
-      speedLine.className = "bambu-speed-line";
-      const mag = (s.speed_mag !== undefined) ? `${s.speed_mag}%` : "N/A";
-      const lvlLabel = speedLevelLabel(s.speed_level);
-      speedLine.innerHTML = `Vitesse: ${mag} (${lvlLabel})`;
-      info.appendChild(speedLine);
-    }
 
     // Ligne 7: WiFi
     if (s.wifi_signal) {

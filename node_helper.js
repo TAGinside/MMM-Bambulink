@@ -11,7 +11,6 @@ module.exports = NodeHelper.create({
   start: function () {
     this.config = null;
     this.client = null;
-    this.connected = false;
     this.log("MMM-Bambulink helper started");
   },
 
@@ -31,7 +30,7 @@ module.exports = NodeHelper.create({
       this.config = payload;
       this.connectMqtt();
     } else if (notification === "BAMBULINK_REQUEST_STATUS") {
-      // Pas besoin de pull actif: la Bambu push déjà régulièrement son status.
+      // Rien à faire: l'imprimante envoie déjà ses statuts en continu via MQTT.
     }
   },
 
@@ -55,9 +54,9 @@ module.exports = NodeHelper.create({
       : `mqtt://${host}:${port}`;
 
     const options = {
-      username: "bblp",                 // Utilisateur MQTT Bambu.
-      password: this.config.accessCode, // Access code LAN comme mot de passe.
-      rejectUnauthorized: false         // Certificat TLS non signé sur l'imprimante.
+      username: "bblp",
+      password: this.config.accessCode,
+      rejectUnauthorized: false
     };
 
     this.log(`Connexion MQTT à ${url}`);
@@ -66,10 +65,9 @@ module.exports = NodeHelper.create({
     const self = this;
 
     this.client.on("connect", function () {
-      self.connected = true;
       self.log("Connecté au broker MQTT Bambu");
 
-      const topic = `device/${self.config.serial}/report`; // Topic status.
+      const topic = `device/${self.config.serial}/report`;
       self.client.subscribe(topic, function (err) {
         if (err) {
           self.log("Erreur abonnement topic: " + err);
@@ -84,7 +82,6 @@ module.exports = NodeHelper.create({
     });
 
     this.client.on("close", function () {
-      self.connected = false;
       self.log("Connexion MQTT fermée");
     });
 
@@ -102,7 +99,7 @@ module.exports = NodeHelper.create({
     });
   },
 
-  // Mappe le JSON Bambu (comme celui fourni) vers un objet simple pour le front.
+  // Mappe le JSON Bambu vers un objet simple pour le front.
   extractStatus: function (data) {
     const p = data.print || {};
 
@@ -118,7 +115,7 @@ module.exports = NodeHelper.create({
       layer_num: p.layer_num,
       total_layer_num: p.total_layer_num,
 
-      // Temps restant (en minutes, converti côté front)
+      // Temps restant (en minutes, conversion en j/h/min côté front)
       remaining_time: (p.remain_time !== undefined)
         ? p.remain_time
         : p.mc_remaining_time,
@@ -152,12 +149,11 @@ module.exports = NodeHelper.create({
       const trayNow = String(p.ams.tray_now);
       const ams0 = p.ams.ams[0];
 
-      // humidité / temp du module AMS lui-même
       if (ams0.humidity_raw !== undefined) {
-        status.ams_humidity = ams0.humidity_raw; // ex: "37"
+        status.ams_humidity = ams0.humidity_raw;
       }
       if (ams0.temp !== undefined) {
-        status.ams_temp = ams0.temp; // ex: "30.1"
+        status.ams_temp = ams0.temp;
       }
 
       if (ams0.tray && Array.isArray(ams0.tray)) {
