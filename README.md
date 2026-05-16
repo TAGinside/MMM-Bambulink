@@ -9,35 +9,30 @@ MMM-Bambulink is a third-party module for MagicMirror² designed to display info
 
 ![Example.png](/thumbnails/) 
 
-# Key Requirements
+## Key Requirements
 To use this module, you need:
+
 * The IP address of your Bambu Lab printer (for local discovery/communication)
-
 * The LAN connection code (access code) for your printer
-
 * The serial number of your printer
 
 These three values are required in the configuration to establish the connection to your printer.
 
-Key Features
-Monitor your Bambu Lab printer directly from MagicMirror²
+## Key Features
 
-Secure LAN connection via MQTT/TLS on port 8883
+* Monitor your Bambu Lab printer directly from MagicMirror²
+* Secure LAN connection via MQTT/TLS on port 8883
+* Configurable refresh interval for real-time updates
+* Simple installation within the standard MagicMirror module structure
+* Optional thumbnail display for the current print
+* Customizable thumbnail path for printer-specific previews
 
-Configurable refresh interval for real-time updates
-
-Optional thumbnail display for the current print
-
-Simple installation within the standard MagicMirror module structure
-
-Customizable thumbnail path for printer-specific previews
-
-Development Status
+## Development Status
 The module is functional and ready for use in a standard MagicMirror² environment, with installation steps, Node.js dependencies, and an update procedure clearly documented in the README. Actually UX is in construction.
 
 The current README is concise and focuses on core setup; detailed feature listings, supported printer states, error handling, and advanced views are not yet fully documented, suggesting the project is still evolving.
 
-Compatibility
+## Compatibility
 MMM-Bambulink is designed for MagicMirror², as installation requires cloning into ~/MagicMirror/modules and adding configuration to config/config.js.
 
 The required parameters (ip, accessCode, serial, mqttPort, useTLS) indicate it targets Bambu Lab printers with LAN mode enabled and MQTT access over a secure tunnel.
