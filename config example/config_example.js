@@ -12,5 +12,5 @@ modules: [
     showThumbnail: true ,
     thumbnailPath: "modules/MMM-Bambulink/public/printer.png",
     }
-  }
+  },
 ]

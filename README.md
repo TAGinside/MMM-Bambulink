@@ -26,7 +26,15 @@ npm install
 
 Configure the module in your `config.js` file.
 
-{
+
+## Using the module
+
+To use this module, add it to the modules array in the `config/config.js` file. 
+
+
+```javascript
+modules: [
+  {
   module: "MMM-Bambulink",
   position: "top_left",
   config: {
@@ -39,7 +47,9 @@ Configure the module in your `config.js` file.
     showThumbnail: true,
     thumbnailPath: "modules/MMM-Bambulink/public/printer.png"
   }
-}
+},
+]
+```
 
 ## Update
 
