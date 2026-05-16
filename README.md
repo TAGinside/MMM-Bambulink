@@ -7,7 +7,7 @@ MMM-Bambulink is a third-party module for MagicMirror² designed to display info
 
 **NOT NEED ONLY LAN MODE**
 
-![Example.png](/assets/uploads/files/1778943557011-example.png) 
+![Example.png](/thumbnails/) 
 
 # Key Requirements
 To use this module, you need:
@@ -33,7 +33,7 @@ Simple installation within the standard MagicMirror module structure
 Customizable thumbnail path for printer-specific previews
 
 Development Status
-The module is functional and ready for use in a standard MagicMirror² environment, with installation steps, Node.js dependencies, and an update procedure clearly documented in the README.
+The module is functional and ready for use in a standard MagicMirror² environment, with installation steps, Node.js dependencies, and an update procedure clearly documented in the README. Actually UX is in construction.
 
 The current README is concise and focuses on core setup; detailed feature listings, supported printer states, error handling, and advanced views are not yet fully documented, suggesting the project is still evolving.
 
