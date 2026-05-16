@@ -3,14 +3,14 @@ modules: [
   module: "MMM-Bambulink",
   position: "top_left",
   config: {
-    ip: "192.168.11.9",
-    accessCode: "1f019aaf",        // LAN Connection Code
-    serial: "01S000XXXX",          // Seial number of the printer
+    ip: "x.x.x.x",                 // IP address of the printer
+    accessCode: "xxxxxxxx",        // LAN Connection Code
+    serial: "XXXXXXXXXXXXXXX",     // Serial number of the printer
     mqttPort: 8883,
     useTLS: true,
-    updateInterval: 5 * 1000,
+    updateInterval: 5000, // ms
     showThumbnail: true ,
-    thumbnailPath: "modules/MMM-Bambulink/public/printer.png",
+    thumbnailPath: "modules/MMM-Bambulink/thumbnails/H2S.png",
     }
   },
 ]

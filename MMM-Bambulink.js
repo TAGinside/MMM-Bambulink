@@ -12,7 +12,7 @@ Module.register("MMM-Bambulink", {
     useTLS: true,
     updateInterval: 5000, // ms
     showThumbnail: true,
-    thumbnailPath: "modules/MMM-Bambulink/public/printer.png"
+    thumbnailPath: "modules/MMM-Bambulink/thumbails/H2S.png"
   },
 
   start: function () {
