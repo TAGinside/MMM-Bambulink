@@ -7,7 +7,7 @@ MMM-Bambulink is a third-party module for MagicMirror² designed to display info
 
 **NOT NEED ONLY LAN MODE**
 
-![Example.png](/thumbnails/) 
+![Example.png](MMM-Bambulink/thumbnails/) 
 
 ## Key Requirements
 To use this module, you need:
@@ -22,6 +22,7 @@ These three values are required in the configuration to establish the connection
 
 * Monitor your Bambu Lab printer directly from MagicMirror²
 * Secure LAN connection via MQTT/TLS on port 8883
+* NOT NEED "ONLY LAN" MODE - you can use Bambu Cloud
 * Configurable refresh interval for real-time updates
 * Simple installation within the standard MagicMirror module structure
 * Optional thumbnail display for the current print
