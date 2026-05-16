@@ -102,12 +102,13 @@ module.exports = NodeHelper.create({
     });
   },
 
-  // Mappe le JSON Bambu (comme celui que tu as envoyé) vers un objet simple
+  // Mappe le JSON Bambu (comme celui fourni) vers un objet simple pour le front.
   extractStatus: function (data) {
     const p = data.print || {};
+
     const status = {
       // État / job
-      state: p.gcode_state,                        // ex: RUNNING
+      state: p.gcode_state,
       job_state: p.job && p.job.job_state,
       subtask_name: p.subtask_name,
       job_id: p.job_id,
@@ -117,15 +118,12 @@ module.exports = NodeHelper.create({
       layer_num: p.layer_num,
       total_layer_num: p.total_layer_num,
 
-      // Temps restant
+      // Temps restant (en minutes, converti côté front)
       remaining_time: (p.remain_time !== undefined)
         ? p.remain_time
         : p.mc_remaining_time,
 
-      // Fichier
-      gcode_file: p.gcode_file,
-
-      // Températures
+      // Températures buse / lit
       nozzle_temp: p.nozzle_temper,
       nozzle_target: p.nozzle_target_temper,
       bed_temp: p.bed_temper,
@@ -139,15 +137,29 @@ module.exports = NodeHelper.create({
       ams_tray_now: undefined,
       ams_tray_type: undefined,
       ams_tray_color: undefined,
+      ams_humidity: undefined,
+      ams_temp: undefined,
+
+      // Température chambre
+      chamber_temp: undefined,
 
       // Réseau
       wifi_signal: p.wifi_signal
     };
 
-    // AMS: slot courant
+    // AMS: slot courant + humidité + température AMS
     if (p.ams && p.ams.tray_now !== undefined && p.ams.ams && p.ams.ams.length > 0) {
-      const trayNow = String(p.ams.tray_now); // "1" dans ton exemple
+      const trayNow = String(p.ams.tray_now);
       const ams0 = p.ams.ams[0];
+
+      // humidité / temp du module AMS lui-même
+      if (ams0.humidity_raw !== undefined) {
+        status.ams_humidity = ams0.humidity_raw; // ex: "37"
+      }
+      if (ams0.temp !== undefined) {
+        status.ams_temp = ams0.temp; // ex: "30.1"
+      }
+
       if (ams0.tray && Array.isArray(ams0.tray)) {
         const tray = ams0.tray.find(t => String(t.id) === trayNow);
         if (tray) {
@@ -156,6 +168,13 @@ module.exports = NodeHelper.create({
           status.ams_tray_color = tray.tray_color;
         }
       }
+    }
+
+    // Température chambre : info.temp ou device.ctc.info.temp suivant le firmware
+    if (p.info && typeof p.info.temp !== "undefined") {
+      status.chamber_temp = p.info.temp;
+    } else if (p.device && p.device.ctc && p.device.ctc.info && typeof p.device.ctc.info.temp !== "undefined") {
+      status.chamber_temp = p.device.ctc.info.temp;
     }
 
     if (!status.state && typeof p.state !== "undefined") {

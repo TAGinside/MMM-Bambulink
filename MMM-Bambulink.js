@@ -2,6 +2,29 @@
  * Module: MMM-Bambulink
  */
 
+// Helper : convertit des minutes en "Xj Yh Zm"
+function formatMinutesToDHM(minutes) {
+  if (minutes === undefined || minutes === null || isNaN(minutes)) {
+    return "N/A";
+  }
+  const total = parseInt(minutes, 10);
+  const days = Math.floor(total / (24 * 60));
+  const hours = Math.floor((total % (24 * 60)) / 60);
+  const mins = total % 60;
+  return `${days}j ${hours}h ${mins}m`;
+}
+
+// Helper : label pour le niveau de vitesse (spd_lvl)
+function speedLevelLabel(level) {
+  switch (parseInt(level, 10)) {
+    case 1: return "Lent";
+    case 2: return "Standard";
+    case 3: return "Sport";
+    case 4: return "Insensé";
+    default: return "Inconnu";
+  }
+}
+
 Module.register("MMM-Bambulink", {
   // Configuration par défaut
   defaults: {
@@ -12,14 +35,14 @@ Module.register("MMM-Bambulink", {
     useTLS: true,
     updateInterval: 5000, // ms
     showThumbnail: true,
-    thumbnailPath: "modules/MMM-Bambulink/thumbails/H2S.png"
+    thumbnailPath: "modules/MMM-Bambulink/public/printer.png"
   },
 
   start: function () {
     this.printerStatus = null;
     this.loaded = false;
 
-    // Envoyer la config au node_helper (obligatoire pour qu'il l'utilise).
+    // Envoyer la config au node_helper.
     this.sendSocketNotification("BAMBULINK_CONFIG", this.config);
 
     const self = this;
@@ -72,18 +95,18 @@ Module.register("MMM-Bambulink", {
     statusLine.innerHTML = `État: ${state} – Job: ${name}`;
     info.appendChild(statusLine);
 
-    // Ligne 2: progression + couches + temps restant
+    // Ligne 2: progression + couches + temps restant (formaté)
     const progressLine = document.createElement("div");
     progressLine.className = "bambu-progress-line";
     const percent = (s.progress !== undefined) ? `${s.progress}%` : "N/A";
     const layers = (s.layer_num !== undefined && s.total_layer_num !== undefined)
       ? `${s.layer_num}/${s.total_layer_num}`
       : "N/A";
-    const remaining = (s.remaining_time !== undefined) ? `${s.remaining_time} min` : "N/A";
+    const remaining = formatMinutesToDHM(s.remaining_time);
     progressLine.innerHTML = `Progression: ${percent} – Couches: ${layers} – Temps restant: ${remaining}`;
     info.appendChild(progressLine);
 
-    // Ligne 3: températures
+    // Ligne 3: températures buse / lit
     const tempLine = document.createElement("div");
     tempLine.className = "bambu-temp-line";
     const noz = (s.nozzle_temp !== undefined) ? `${s.nozzle_temp}°C` : "N/A";
@@ -93,23 +116,52 @@ Module.register("MMM-Bambulink", {
     tempLine.innerHTML = `Buse: ${noz} (${nozTar}) – Lit: ${bed} (${bedTar})`;
     info.appendChild(tempLine);
 
-    // Ligne 4: filament AMS
-    if (s.ams_tray_now !== undefined) {
+    // Ligne 4: température chambre
+    if (s.chamber_temp !== undefined) {
+      const chamberLine = document.createElement("div");
+      chamberLine.className = "bambu-chamber-line";
+      chamberLine.innerHTML = `Temp. chambre: ${s.chamber_temp}°C`;
+      info.appendChild(chamberLine);
+    }
+
+    // Ligne 5: filament AMS + humidité + température AMS
+    if (s.ams_tray_now !== undefined || s.ams_humidity !== undefined || s.ams_temp !== undefined) {
       const amsLine = document.createElement("div");
       amsLine.className = "bambu-ams-line";
-      const tType = s.ams_tray_type || "Inconnu";
-      const color = s.ams_tray_color || "";
-      amsLine.innerHTML = `AMS Slot ${s.ams_tray_now}: ${tType} ${color}`;
+
+      const slotPart = (s.ams_tray_now !== undefined)
+        ? `Slot ${s.ams_tray_now}: ${s.ams_tray_type || "Inconnu"}`
+        : "AMS";
+      const humPart = (s.ams_humidity !== undefined)
+        ? `Humidité: ${s.ams_humidity}%`
+        : "";
+      const tempPart = (s.ams_temp !== undefined)
+        ? `Temp: ${s.ams_temp}°C`
+        : "";
+
+      amsLine.innerHTML = `${slotPart}` +
+        (humPart ? ` – ${humPart}` : "") +
+        (tempPart ? ` – ${tempPart}` : "");
       info.appendChild(amsLine);
     }
 
-    // Ligne 5: fichier + wifi
-    const fileLine = document.createElement("div");
-    fileLine.className = "bambu-file-line";
-    const file = s.gcode_file || "—";
-    const wifi = s.wifi_signal || "N/A";
-    fileLine.innerHTML = `Fichier: ${file} – WiFi: ${wifi}`;
-    info.appendChild(fileLine);
+    // Ligne 6: vitesse impression
+    if (s.speed_mag !== undefined || s.speed_level !== undefined) {
+      const speedLine = document.createElement("div");
+      speedLine.className = "bambu-speed-line";
+      const mag = (s.speed_mag !== undefined) ? `${s.speed_mag}%` : "N/A";
+      const lvlLabel = speedLevelLabel(s.speed_level);
+      speedLine.innerHTML = `Vitesse: ${mag} (${lvlLabel})`;
+      info.appendChild(speedLine);
+    }
+
+    // Ligne 7: WiFi
+    if (s.wifi_signal) {
+      const netLine = document.createElement("div");
+      netLine.className = "bambu-net-line";
+      netLine.innerHTML = `WiFi: ${s.wifi_signal}`;
+      info.appendChild(netLine);
+    }
 
     container.appendChild(info);
     wrapper.appendChild(container);
