@@ -28,3 +28,8 @@
 .mmm-bambulink .bambu-file-line {
   margin-top: 2px;
 }
+
+.mmm-bambulink .bambu-ams-color-box {
+  border-radius: 2px;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+}
