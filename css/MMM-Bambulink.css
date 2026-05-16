@@ -1,0 +1,30 @@
+.mmm-bambulink .bambu-container {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.mmm-bambulink .bambu-thumbnail {
+  width: 80px;
+  height: auto;
+  margin-right: 10px;
+  border-radius: 4px;
+}
+
+.mmm-bambulink .bambu-info {
+  display: flex;
+  flex-direction: column;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.mmm-bambulink .bambu-status-line {
+  font-weight: 600;
+}
+
+.mmm-bambulink .bambu-progress-line,
+.mmm-bambulink .bambu-temp-line,
+.mmm-bambulink .bambu-ams-line,
+.mmm-bambulink .bambu-file-line {
+  margin-top: 2px;
+}

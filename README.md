@@ -26,6 +26,21 @@ npm install
 
 Configure the module in your `config.js` file.
 
+{
+  module: "MMM-Bambulink",
+  position: "top_left",
+  config: {
+    ip: "192.168.11.9",
+    accessCode: "1f019aaf",        // ton code de connexion LAN
+    serial: "01S000XXXX",          // à remplacer par le serial de ton imprimante
+    mqttPort: 8883,
+    useTLS: true,
+    updateInterval: 5 * 1000,
+    showThumbnail: true,
+    thumbnailPath: "modules/MMM-Bambulink/public/printer.png"
+  }
+}
+
 ## Update
 
 ```sh
