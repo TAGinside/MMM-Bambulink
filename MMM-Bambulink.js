@@ -7,10 +7,12 @@ function formatMinutesToDHM(minutes) {
   if (minutes === undefined || minutes === null || isNaN(minutes)) {
     return "N/A";
   }
+
   const total = parseInt(minutes, 10);
   const days = Math.floor(total / (24 * 60));
   const hours = Math.floor((total % (24 * 60)) / 60);
   const mins = total % 60;
+
   return `${days}j ${hours}h ${mins}m`;
 }
 
@@ -72,6 +74,7 @@ Module.register("MMM-Bambulink", {
   start: function () {
     this.printerStatus = null;
     this.loaded = false;
+
     this.lastKnownTemps = {
       nozzle: null,
       bed: null,
@@ -79,13 +82,12 @@ Module.register("MMM-Bambulink", {
     };
 
     // Historique local des températures pour le graphe
-    
     this.temperatureHistory = [];
 
     // Identifiant unique par instance du module
     this.instanceId = "bambulink-" + this.identifier;
 
-    // Envoyer la config au node_helper.
+    // Envoie la configuration au node_helper
     this.sendSocketNotification("BAMBULINK_CONFIG", this.config);
 
     const self = this;
@@ -97,7 +99,7 @@ Module.register("MMM-Bambulink", {
   },
 
   getStyles: function () {
-  return [this.file("css/MMM-Bambulink.css")];
+    return [this.file("css/MMM-Bambulink.css")];
   },
 
   // Convertit une valeur en nombre exploitable ou null
@@ -113,35 +115,65 @@ Module.register("MMM-Bambulink", {
     return (value !== undefined && value !== null && !isNaN(value)) ? `${value}°C` : "N/A";
   },
 
+  // Nettoie / normalise une couleur de tray Bambu
+  normalizeTrayColor: function (color) {
+    if (!color) {
+      return null;
+    }
+
+    const raw = String(color).replace("#", "").trim();
+
+    if (!raw) {
+      return null;
+    }
+
+    const hex = raw.substring(0, 6);
+
+    if (!/^[0-9a-fA-F]{6}$/.test(hex)) {
+      return null;
+    }
+
+    return `#${hex}`;
+  },
+
+  // Retourne un nom d'affichage pour un slot AMS
+  formatSlotName: function (slotId) {
+    const num = Number(slotId);
+    if (!isNaN(num)) {
+      return `Slot ${num + 1}`;
+    }
+    return `Slot ${slotId}`;
+  },
+
   // Ajoute un point dans l'historique local
   addTemperatureSnapshot: function (status) {
-  const now = Date.now();
+    const now = Date.now();
 
-  const nozzleValue = this.toNumberOrNull(status.nozzle_temp);
-  const bedValue = this.toNumberOrNull(status.bed_temp);
-  const chamberValue = this.toNumberOrNull(status.chamber_temp);
+    const nozzleValue = this.toNumberOrNull(status.nozzle_temp);
+    const bedValue = this.toNumberOrNull(status.bed_temp);
+    const chamberValue = this.toNumberOrNull(status.chamber_temp);
 
-  // Mémorise la dernière valeur connue si une nouvelle valeur est présente
-  if (nozzleValue !== null) {
-    this.lastKnownTemps.nozzle = nozzleValue;
-  }
-  if (bedValue !== null) {
-    this.lastKnownTemps.bed = bedValue;
-  }
-  if (chamberValue !== null) {
-    this.lastKnownTemps.chamber = chamberValue;
-  }
+    // Mémorise la dernière valeur connue si une nouvelle valeur est présente
+    if (nozzleValue !== null) {
+      this.lastKnownTemps.nozzle = nozzleValue;
+    }
+    if (bedValue !== null) {
+      this.lastKnownTemps.bed = bedValue;
+    }
+    if (chamberValue !== null) {
+      this.lastKnownTemps.chamber = chamberValue;
+    }
 
-  // Construit un point complet avec les dernières valeurs connues
-  this.temperatureHistory.push({
-    ts: now,
-    nozzle: this.lastKnownTemps.nozzle,
-    bed: this.lastKnownTemps.bed,
-    chamber: this.lastKnownTemps.chamber
-  });
+    // Construit un point complet avec les dernières valeurs connues
+    this.temperatureHistory.push({
+      ts: now,
+      nozzle: this.lastKnownTemps.nozzle,
+      bed: this.lastKnownTemps.bed,
+      chamber: this.lastKnownTemps.chamber
+    });
 
-  this.pruneTemperatureHistory();
-},
+    this.pruneTemperatureHistory();
+  },
 
   // Garde uniquement les X dernières minutes
   pruneTemperatureHistory: function () {
@@ -230,6 +262,7 @@ Module.register("MMM-Bambulink", {
     meterFill.className = "bambu-temp-meter-fill";
 
     let ratio = 0;
+
     if (
       currentValue !== undefined && currentValue !== null && !isNaN(currentValue) &&
       targetValue !== undefined && targetValue !== null && !isNaN(targetValue) &&
@@ -254,7 +287,7 @@ Module.register("MMM-Bambulink", {
   hexToRgba: function (hex, alpha) {
     const sanitized = String(hex || "").replace("#", "").trim();
     const full = sanitized.length === 3
-      ? sanitized.split("").map(char => char + char).join("")
+      ? sanitized.split("").map(function (char) { return char + char; }).join("")
       : sanitized.substring(0, 6);
 
     const r = parseInt(full.substring(0, 2), 16) || 255;
@@ -321,23 +354,29 @@ Module.register("MMM-Bambulink", {
       {
         key: "nozzle",
         color: colors.nozzle || "#ff4d4f",
-        values: history.filter(p => p.nozzle !== null).map(p => ({ ts: p.ts, value: p.nozzle }))
+        values: history.filter(function (p) { return p.nozzle !== null; }).map(function (p) {
+          return { ts: p.ts, value: p.nozzle };
+        })
       },
       {
         key: "bed",
         color: colors.bed || "#ff9f1a",
-        values: history.filter(p => p.bed !== null).map(p => ({ ts: p.ts, value: p.bed }))
+        values: history.filter(function (p) { return p.bed !== null; }).map(function (p) {
+          return { ts: p.ts, value: p.bed };
+        })
       },
       {
         key: "chamber",
         color: colors.chamber || "#4da3ff",
-        values: history.filter(p => p.chamber !== null).map(p => ({ ts: p.ts, value: p.chamber }))
+        values: history.filter(function (p) { return p.chamber !== null; }).map(function (p) {
+          return { ts: p.ts, value: p.chamber };
+        })
       }
     ];
 
     const allValues = [];
-    series.forEach(function (s) {
-      s.values.forEach(function (point) {
+    series.forEach(function (serie) {
+      serie.values.forEach(function (point) {
         if (point.ts >= minTs) {
           allValues.push(point.value);
         }
@@ -349,6 +388,7 @@ Module.register("MMM-Bambulink", {
       ctx.fillStyle = "rgba(255,255,255,0.45)";
       ctx.font = `${display.fontSizes?.graphLabel || 10}px Arial`;
       ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
       ctx.fillText("Aucune donnée", width / 2, height / 2);
       ctx.restore();
       return;
@@ -403,6 +443,7 @@ Module.register("MMM-Bambulink", {
         ctx.lineTo(x, padding.top + graphHeight);
         ctx.stroke();
       }
+
       ctx.restore();
     }
 
@@ -418,6 +459,7 @@ Module.register("MMM-Bambulink", {
       const y = padding.top + (graphHeight / 4) * i;
       ctx.fillText(`${Math.round(value)}°`, padding.left - 5, y);
     }
+
     ctx.restore();
 
     // Repères X
@@ -433,6 +475,7 @@ Module.register("MMM-Bambulink", {
       const label = `${maxMinutes - i}m`;
       ctx.fillText(label, x, padding.top + graphHeight + 5);
     }
+
     ctx.restore();
 
     const lineWidth = display.graphLineWidth || 2;
@@ -440,7 +483,9 @@ Module.register("MMM-Bambulink", {
     const showDots = display.graphShowDots === true;
 
     series.forEach((serie) => {
-      const visibleValues = serie.values.filter(point => point.ts >= minTs);
+      const visibleValues = serie.values.filter(function (point) {
+        return point.ts >= minTs;
+      });
 
       if (!visibleValues.length) {
         return;
@@ -554,17 +599,16 @@ Module.register("MMM-Bambulink", {
     }
 
     const s = this.printerStatus;
-
     const container = document.createElement("div");
     container.className = "bambu-container";
 
-    // En-tête vertical
+    // En-tête principal
     const header = document.createElement("div");
     header.className = "bambu-header bambu-panel";
 
     const state = s.state || "Inconnu";
     const name = s.subtask_name || "—";
-    const percent = (s.progress !== undefined) ? `${s.progress}%` : "N/A";
+    const percent = (s.progress !== undefined && !isNaN(s.progress)) ? `${s.progress}%` : "N/A";
 
     const statusLine = document.createElement("div");
     statusLine.className = "bambu-status-line";
@@ -597,20 +641,23 @@ Module.register("MMM-Bambulink", {
     header.appendChild(progressValue);
     header.appendChild(progressBar);
 
-    // Méta infos verticales
+    container.appendChild(header);
+
+    // Méta informations
     const metaPanel = document.createElement("div");
     metaPanel.className = "bambu-meta-panel bambu-panel";
 
     const layers = (s.layer_num !== undefined && s.total_layer_num !== undefined)
       ? `${s.layer_num}/${s.total_layer_num}`
       : "N/A";
+
     const remaining = formatMinutesToDHM(s.remaining_time);
 
     metaPanel.appendChild(this.createMetaItem("Couches", layers));
     metaPanel.appendChild(this.createMetaItem("Temps restant", remaining));
 
     if (s.speed_mag !== undefined || s.speed_level !== undefined) {
-      const mag = (s.speed_mag !== undefined) ? `${s.speed_mag}%` : "N/A";
+      const mag = (s.speed_mag !== undefined && !isNaN(s.speed_mag)) ? `${s.speed_mag}%` : "N/A";
       const lvlLabel = speedLevelLabel(s.speed_level);
       metaPanel.appendChild(this.createMetaItem("Vitesse", `${mag} (${lvlLabel})`));
     }
@@ -619,7 +666,9 @@ Module.register("MMM-Bambulink", {
       metaPanel.appendChild(this.createMetaItem("WiFi", s.wifi_signal));
     }
 
-    // Températures en pile verticale
+    container.appendChild(metaPanel);
+
+    // Températures
     const temperatureSection = document.createElement("div");
     temperatureSection.className = "bambu-temperature-section";
 
@@ -643,7 +692,7 @@ Module.register("MMM-Bambulink", {
       )
     );
 
-    if (s.chamber_temp !== undefined) {
+    if (s.chamber_temp !== undefined && s.chamber_temp !== null && s.chamber_temp !== "") {
       temperatureSection.appendChild(
         this.createTemperatureCard(
           "Chambre",
@@ -655,55 +704,113 @@ Module.register("MMM-Bambulink", {
       );
     }
 
+    container.appendChild(temperatureSection);
+
     // AMS
-    if (s.ams_tray_now !== undefined || s.ams_humidity !== undefined || s.ams_temp !== undefined) {
+    if (
+      s.ams_tray_now !== undefined ||
+      s.ams_humidity !== undefined ||
+      s.ams_temp !== undefined ||
+      (Array.isArray(s.ams_slots) && s.ams_slots.length > 0)
+    ) {
       const amsPanel = document.createElement("div");
       amsPanel.className = "bambu-ams-line bambu-panel";
 
-      const slotRow = document.createElement("div");
-      slotRow.className = "bambu-ams-slot-row";
+      const amsTitle = document.createElement("div");
+      amsTitle.className = "bambu-ams-title";
+      amsTitle.textContent = "AMS";
+      amsPanel.appendChild(amsTitle);
 
-      const slotSpan = document.createElement("span");
-      slotSpan.textContent = (s.ams_tray_now !== undefined)
-        ? `Slot ${s.ams_tray_now}: ${s.ams_tray_type || "Inconnu"}`
-        : "AMS";
-      slotRow.appendChild(slotSpan);
+      // Humidité / température en 2 colonnes
+      const amsMetaGrid = document.createElement("div");
+      amsMetaGrid.className = "bambu-ams-meta-grid";
 
-      if (s.ams_tray_color) {
-        const colorBox = document.createElement("span");
-        colorBox.className = "bambu-ams-color-box";
-        const rgb = s.ams_tray_color.replace("#", "").substring(0, 6);
-        colorBox.style.backgroundColor = "#" + rgb;
-        slotRow.appendChild(colorBox);
+      if (s.ams_humidity !== undefined && s.ams_humidity !== null && s.ams_humidity !== "") {
+        const humidityItem = document.createElement("div");
+        humidityItem.className = "bambu-ams-meta-item";
+
+        const humidityLabel = document.createElement("div");
+        humidityLabel.className = "bambu-ams-meta-label";
+        humidityLabel.textContent = "Humidité";
+
+        const humidityValue = document.createElement("div");
+        humidityValue.className = "bambu-ams-meta-value";
+        humidityValue.textContent = `${s.ams_humidity}%`;
+
+        humidityItem.appendChild(humidityLabel);
+        humidityItem.appendChild(humidityValue);
+        amsMetaGrid.appendChild(humidityItem);
       }
 
-      amsPanel.appendChild(slotRow);
+      if (s.ams_temp !== undefined && s.ams_temp !== null && s.ams_temp !== "") {
+        const tempItem = document.createElement("div");
+        tempItem.className = "bambu-ams-meta-item";
 
-      if (s.ams_humidity !== undefined) {
-        const humidityLine = document.createElement("div");
-        humidityLine.className = "bambu-ams-detail";
-        humidityLine.textContent = `Humidité: ${s.ams_humidity}%`;
-        amsPanel.appendChild(humidityLine);
+        const tempLabel = document.createElement("div");
+        tempLabel.className = "bambu-ams-meta-label";
+        tempLabel.textContent = "Temp";
+
+        const tempValue = document.createElement("div");
+        tempValue.className = "bambu-ams-meta-value";
+        tempValue.textContent = `${s.ams_temp}°C`;
+
+        tempItem.appendChild(tempLabel);
+        tempItem.appendChild(tempValue);
+        amsMetaGrid.appendChild(tempItem);
       }
 
-      if (s.ams_temp !== undefined) {
-        const tempLine = document.createElement("div");
-        tempLine.className = "bambu-ams-detail";
-        tempLine.textContent = `Temp: ${s.ams_temp}°C`;
-        amsPanel.appendChild(tempLine);
+      if (amsMetaGrid.childNodes.length > 0) {
+        amsPanel.appendChild(amsMetaGrid);
       }
 
-      container.appendChild(header);
-      container.appendChild(metaPanel);
-      container.appendChild(temperatureSection);
+      // Slots AMS
+      if (Array.isArray(s.ams_slots) && s.ams_slots.length > 0) {
+        const slotsGrid = document.createElement("div");
+        slotsGrid.className = "bambu-ams-slots-grid";
+
+        s.ams_slots.forEach((slot) => {
+          const slotCard = document.createElement("div");
+          slotCard.className = "bambu-ams-slot";
+
+          if (s.ams_tray_now !== undefined && String(slot.id) === String(s.ams_tray_now)) {
+            slotCard.classList.add("is-active");
+          }
+
+          const slotHeader = document.createElement("div");
+          slotHeader.className = "bambu-ams-slot-header";
+
+          const slotName = document.createElement("div");
+          slotName.className = "bambu-ams-slot-name";
+          slotName.textContent = this.formatSlotName(slot.id);
+
+          const colorBox = document.createElement("span");
+          colorBox.className = "bambu-ams-slot-color";
+
+          const normalizedColor = this.normalizeTrayColor(slot.tray_color);
+          if (normalizedColor) {
+            colorBox.style.backgroundColor = normalizedColor;
+          }
+
+          slotHeader.appendChild(slotName);
+          slotHeader.appendChild(colorBox);
+
+          const slotType = document.createElement("div");
+          slotType.className = "bambu-ams-slot-type";
+          slotType.textContent = slot.tray_type || "Vide";
+
+          slotCard.appendChild(slotHeader);
+          slotCard.appendChild(slotType);
+
+          slotsGrid.appendChild(slotCard);
+        });
+
+        amsPanel.appendChild(slotsGrid);
+      }
+
       container.appendChild(amsPanel);
-    } else {
-      container.appendChild(header);
-      container.appendChild(metaPanel);
-      container.appendChild(temperatureSection);
     }
 
-    // Graphe vertical
+    // Graphe
     if (display.showGraph !== false) {
       const graphPanel = document.createElement("div");
       graphPanel.className = "bambu-graph-panel bambu-panel";
@@ -715,7 +822,7 @@ Module.register("MMM-Bambulink", {
         legend.appendChild(this.createLegendItem("Buse", tempColors.nozzle || "#ff4d4f"));
         legend.appendChild(this.createLegendItem("Lit", tempColors.bed || "#ff9f1a"));
 
-        if (s.chamber_temp !== undefined) {
+        if (s.chamber_temp !== undefined && s.chamber_temp !== null && s.chamber_temp !== "") {
           legend.appendChild(this.createLegendItem("Chambre", tempColors.chamber || "#4da3ff"));
         }
 
