@@ -86,27 +86,29 @@
 
 /* Méta infos en colonne */
 .mmm-bambulink .bambu-meta-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 12px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 12px;
+  padding: 10px 12px;
+  align-items: start;
 }
 
 .mmm-bambulink .bambu-meta-item {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
+  min-width: 0;
 }
 
 .mmm-bambulink .bambu-meta-label {
   font-size: var(--bambu-meta-font-size);
-  line-height: 1.2;
+  line-height: 1.15;
   color: rgba(255, 255, 255, 0.46);
 }
 
 .mmm-bambulink .bambu-meta-value {
   font-size: var(--bambu-base-font-size);
-  line-height: 1.35;
+  line-height: 1.2;
   color: rgba(255, 255, 255, 0.9);
   word-break: break-word;
 }
