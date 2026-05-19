@@ -30,7 +30,7 @@ module.exports = NodeHelper.create({
       this.config = payload;
       this.connectMqtt();
     } else if (notification === "BAMBULINK_REQUEST_STATUS") {
-      // Rien à faire: l'imprimante envoie déjà ses statuts en continu via MQTT.
+      // Rien à faire : l'imprimante envoie déjà ses statuts en continu via MQTT.
     }
   },
 
@@ -136,6 +136,7 @@ module.exports = NodeHelper.create({
       ams_tray_color: undefined,
       ams_humidity: undefined,
       ams_temp: undefined,
+      ams_slots: [],
 
       // Température chambre
       chamber_temp: undefined,
@@ -144,24 +145,49 @@ module.exports = NodeHelper.create({
       wifi_signal: p.wifi_signal
     };
 
-    // AMS: slot courant + humidité + température AMS
-    if (p.ams && p.ams.tray_now !== undefined && p.ams.ams && p.ams.ams.length > 0) {
-      const trayNow = String(p.ams.tray_now);
+    // AMS : slot courant + humidité + température AMS + liste complète des slots
+    if (p.ams && Array.isArray(p.ams.ams) && p.ams.ams.length > 0) {
+      const trayNow = (p.ams.tray_now !== undefined && p.ams.tray_now !== null)
+        ? String(p.ams.tray_now)
+        : null;
+
       const ams0 = p.ams.ams[0];
 
       if (ams0.humidity_raw !== undefined) {
         status.ams_humidity = ams0.humidity_raw;
       }
+
       if (ams0.temp !== undefined) {
         status.ams_temp = ams0.temp;
       }
 
-      if (ams0.tray && Array.isArray(ams0.tray)) {
-        const tray = ams0.tray.find(t => String(t.id) === trayNow);
-        if (tray) {
-          status.ams_tray_now = tray.id;
-          status.ams_tray_type = tray.tray_type;
-          status.ams_tray_color = tray.tray_color;
+      if (Array.isArray(ams0.tray)) {
+        status.ams_slots = ams0.tray.map(function (tray) {
+          return {
+            id: tray.id,
+            tray_type: (tray.tray_type !== undefined && tray.tray_type !== null && tray.tray_type !== "")
+              ? tray.tray_type
+              : "Vide",
+            tray_color: (tray.tray_color !== undefined && tray.tray_color !== null && tray.tray_color !== "")
+              ? tray.tray_color
+              : null
+          };
+        });
+
+        if (trayNow !== null) {
+          const currentTray = ams0.tray.find(function (t) {
+            return String(t.id) === trayNow;
+          });
+
+          if (currentTray) {
+            status.ams_tray_now = currentTray.id;
+            status.ams_tray_type = (currentTray.tray_type !== undefined && currentTray.tray_type !== null && currentTray.tray_type !== "")
+              ? currentTray.tray_type
+              : "Vide";
+            status.ams_tray_color = (currentTray.tray_color !== undefined && currentTray.tray_color !== null && currentTray.tray_color !== "")
+              ? currentTray.tray_color
+              : null;
+          }
         }
       }
     }
@@ -176,6 +202,7 @@ module.exports = NodeHelper.create({
     if (!status.state && typeof p.state !== "undefined") {
       status.state = p.state;
     }
+
     if (!status.state) {
       status.state = "Unknown";
     }

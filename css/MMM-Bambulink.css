@@ -1,34 +1,394 @@
+.mmm-bambulink {
+  --bambu-scale: 1;
+  --bambu-width: 320px;
+  --bambu-base-font-size: 12px;
+  --bambu-status-font-size: 14px;
+  --bambu-meta-font-size: 11px;
+  --bambu-temp-value-font-size: 18px;
+  --bambu-temp-target-font-size: 11px;
+  --bambu-graph-label-font-size: 10px;
+  --bambu-radius: 14px;
+  --bambu-content-gap: 8px;
+  --bambu-section-gap: 8px;
+  --bambu-nozzle-color: #ff4d4f;
+  --bambu-bed-color: #ff9f1a;
+  --bambu-chamber-color: #4da3ff;
+
+  width: var(--bambu-width);
+  transform: scale(var(--bambu-scale));
+  transform-origin: top left;
+  font-size: var(--bambu-base-font-size);
+  color: rgba(255, 255, 255, 0.92);
+}
+
 .mmm-bambulink .bambu-container {
   display: flex;
-  align-items: center;
-  justify-content: flex-start;
+  flex-direction: column;
+  gap: var(--bambu-section-gap);
 }
 
-.mmm-bambulink .bambu-info {
+.mmm-bambulink .bambu-panel {
+  background: linear-gradient(180deg, rgba(18, 18, 20, 0.92) 0%, rgba(8, 8, 10, 0.96) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: var(--bambu-radius);
+  box-shadow:
+    0 6px 18px rgba(0, 0, 0, 0.26),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  overflow: hidden;
+}
+
+/* ==========================
+   TUILE SYNTHÈSE PRINCIPALE
+   ========================== */
+
+.mmm-bambulink .bambu-summary-card {
   display: flex;
   flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+}
+
+.mmm-bambulink .bambu-summary-title {
   font-size: 11px;
-  line-height: 1.4;
+  line-height: 1.1;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.74);
 }
 
-.mmm-bambulink .bambu-status-line,
-.mmm-bambulink .bambu-progress-line,
-.mmm-bambulink .bambu-temp-line,
-.mmm-bambulink .bambu-ams-line,
-.mmm-bambulink .bambu-speed-line,
-.mmm-bambulink .bambu-net-line,
-.mmm-bambulink .bambu-chamber-line,
-.mmm-bambulink .bambu-file-line {
-  margin-top: 2px;
+.mmm-bambulink .bambu-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
 }
 
-/* Rectangle couleur AMS (inséré en <span class="bambu-ams-color-box"> dans le JS) */
-.mmm-bambulink .bambu-ams-color-box {
-  display: inline-block;
-  width: 38px;          /* ≈ 1 cm */
-  height: 1.2em;        /* hauteur proche de la taille du texte */
-  margin: 0 6px;
-  border-radius: 2px;
-  border: 1px solid rgba(0, 0, 0, 0.2);
-  vertical-align: middle;
+.mmm-bambulink .bambu-summary-cell {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mmm-bambulink .bambu-summary-label {
+  font-size: 10px;
+  line-height: 1.1;
+  color: rgba(255, 255, 255, 0.42);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.mmm-bambulink .bambu-summary-value {
+  font-size: 12px;
+  line-height: 1.25;
+  color: rgba(255, 255, 255, 0.94);
+  font-weight: 600;
+  word-break: break-word;
+}
+
+.mmm-bambulink .bambu-summary-progress-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 2px;
+}
+
+.mmm-bambulink .bambu-summary-progress-big {
+  font-size: 30px;
+  line-height: 1;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Barre de progression */
+
+.mmm-bambulink .bambu-progress-bar {
+  width: 100%;
+  height: 10px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
+.mmm-bambulink .bambu-progress-bar-bottom {
+  margin-top: 0;
+}
+
+.mmm-bambulink .bambu-progress-bar-fill {
+  height: 100%;
+  width: 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #2ee59d 0%, #37d67a 50%, #5cf2b3 100%);
+  box-shadow:
+    0 0 12px rgba(46, 229, 157, 0.22),
+    inset 0 0 6px rgba(255, 255, 255, 0.15);
+  transition: width 400ms ease;
+}
+
+/* ==========================
+   TEMPÉRATURES
+   ========================== */
+
+.mmm-bambulink .bambu-temperature-section {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--bambu-content-gap);
+}
+
+.mmm-bambulink .bambu-temp-card {
+  --temp-accent: #ffffff;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px 10px 9px;
+  border-radius: var(--bambu-radius);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.035) 0%, rgba(255, 255, 255, 0.02) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
+}
+
+.mmm-bambulink .bambu-temp-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 14px;
+}
+
+.mmm-bambulink .bambu-temp-label {
+  font-size: 10px;
+  line-height: 1.1;
+  color: rgba(255, 255, 255, 0.46);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.mmm-bambulink .bambu-temp-target {
+  font-size: var(--bambu-temp-target-font-size);
+  line-height: 1.1;
+  color: rgba(255, 255, 255, 0.50);
+  font-variant-numeric: tabular-nums;
+}
+
+.mmm-bambulink .bambu-temp-value {
+  font-size: var(--bambu-temp-value-font-size);
+  line-height: 1;
+  font-weight: 700;
+  color: var(--temp-accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.mmm-bambulink .bambu-temp-meter {
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.mmm-bambulink .bambu-temp-meter-fill {
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--temp-accent) 0%, rgba(255, 255, 255, 0.95) 100%);
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.10);
+  transition: width 400ms ease;
+}
+
+.mmm-bambulink .bambu-temp-card.is-nozzle {
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 77, 79, 0.10),
+    0 0 0 rgba(0, 0, 0, 0);
+}
+
+.mmm-bambulink .bambu-temp-card.is-bed {
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 159, 26, 0.10),
+    0 0 0 rgba(0, 0, 0, 0);
+}
+
+.mmm-bambulink .bambu-temp-card.is-chamber {
+  box-shadow:
+    inset 0 0 0 1px rgba(77, 163, 255, 0.10),
+    0 0 0 rgba(0, 0, 0, 0);
+}
+
+/* ==========================
+   AMS
+   ========================== */
+
+.mmm-bambulink .bambu-ams-line {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+}
+
+.mmm-bambulink .bambu-ams-title {
+  font-size: 11px;
+  line-height: 1.1;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.74);
+}
+
+.mmm-bambulink .bambu-ams-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.mmm-bambulink .bambu-ams-meta-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.mmm-bambulink .bambu-ams-meta-label {
+  font-size: 10px;
+  line-height: 1.1;
+  color: rgba(255, 255, 255, 0.42);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.mmm-bambulink .bambu-ams-meta-value {
+  font-size: 12px;
+  line-height: 1.2;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.92);
+  font-variant-numeric: tabular-nums;
+}
+
+.mmm-bambulink .bambu-ams-slots-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.mmm-bambulink .bambu-ams-slot {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 9px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  transition:
+    border-color 220ms ease,
+    background 220ms ease,
+    box-shadow 220ms ease;
+}
+
+.mmm-bambulink .bambu-ams-slot.is-active {
+  border-color: rgba(46, 229, 157, 0.45);
+  background: linear-gradient(180deg, rgba(46, 229, 157, 0.10) 0%, rgba(46, 229, 157, 0.04) 100%);
+  box-shadow:
+    0 0 0 1px rgba(46, 229, 157, 0.10),
+    0 0 16px rgba(46, 229, 157, 0.08);
+}
+
+.mmm-bambulink .bambu-ams-slot-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.mmm-bambulink .bambu-ams-slot-name {
+  font-size: 11px;
+  line-height: 1.1;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.mmm-bambulink .bambu-ams-slot-color {
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
+}
+
+.mmm-bambulink .bambu-ams-slot-type {
+  font-size: 11px;
+  line-height: 1.25;
+  color: rgba(255, 255, 255, 0.60);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ==========================
+   GRAPHE
+   ========================== */
+
+.mmm-bambulink .bambu-graph-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+}
+
+.mmm-bambulink .bambu-graph-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.mmm-bambulink .bambu-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mmm-bambulink .bambu-legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  flex: 0 0 auto;
+}
+
+.mmm-bambulink .bambu-legend-text {
+  font-size: 10px;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.mmm-bambulink .bambu-graph-canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 10px;
+}
+
+/* ==========================
+   ÉTATS / FALLBACKS
+   ========================== */
+
+.mmm-bambulink canvas {
+  image-rendering: auto;
+}
+
+.mmm-bambulink .dimmed,
+.mmm-bambulink .xsmall,
+.mmm-bambulink .small,
+.mmm-bambulink .normal,
+.mmm-bambulink .bright {
+  font-size: inherit;
+}
+
+@media screen and (min-width: 500px) {
+  .mmm-bambulink .bambu-summary-progress-big {
+    font-size: 34px;
+  }
 }
