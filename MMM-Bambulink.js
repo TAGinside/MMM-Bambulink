@@ -34,16 +34,12 @@ Module.register("MMM-Bambulink", {
     mqttPort: 8883,
     useTLS: true,
     updateInterval: 5000, // ms
-    showThumbnail: true,
-    thumbnailPath: "modules/MMM-Bambulink/public/printer.png",
 
-    /*
-     * Configuration UX/UI uniquement.
-     * Aucun impact sur la logique MQTT ou sur le mapping des données.
-     */
+    // Configuration UX/UI uniquement
     display: {
       scale: 1,
-      compact: false,
+      width: 320,
+      compact: true,
       showGraph: true,
       graphHeight: 120,
       graphMinutes: 30,
@@ -53,7 +49,7 @@ Module.register("MMM-Bambulink", {
       graphShowGrid: true,
       graphShowDots: false,
       borderRadius: 14,
-      contentGap: 10,
+      contentGap: 8,
       sectionGap: 8,
       fontSizes: {
         base: 12,
@@ -65,13 +61,7 @@ Module.register("MMM-Bambulink", {
       }
     },
 
-    /*
-     * Couleurs des températures configurables.
-     * Exemple demandé :
-     * - rouge buse
-     * - orange lit
-     * - bleu chambre
-     */
+    // Couleur de chaque élément de température
     temperatureColors: {
       nozzle: "#ff4d4f",
       bed: "#ff9f1a",
@@ -83,14 +73,10 @@ Module.register("MMM-Bambulink", {
     this.printerStatus = null;
     this.loaded = false;
 
-    /*
-     * Historique local des températures pour le graphe.
-     * On reste 100% côté front, sans modifier node_helper ni MQTT.
-     * Chaque point représente une capture à la réception d'un statut.
-     */
+    // Historique local des températures pour le graphe
     this.temperatureHistory = [];
 
-    // Identifiant unique pour éviter toute collision si plusieurs modules sont affichés.
+    // Identifiant unique par instance du module
     this.instanceId = "bambulink-" + this.identifier;
 
     // Envoyer la config au node_helper.
@@ -105,15 +91,23 @@ Module.register("MMM-Bambulink", {
   },
 
   getStyles: function () {
-    return ["MMM-Bambulink.css"];
+    return ["css/MMM-Bambulink.css"];
   },
 
-  /*
-   * Historique de température :
-   * - on stocke le timestamp
-   * - on conserve uniquement la fenêtre demandée en minutes
-   * - aucune modification des données sources, uniquement de la mémorisation front
-   */
+  // Convertit une valeur en nombre exploitable ou null
+  toNumberOrNull: function (value) {
+    if (value === undefined || value === null || value === "" || isNaN(value)) {
+      return null;
+    }
+    return Number(value);
+  },
+
+  // Formate une température
+  formatTemp: function (value) {
+    return (value !== undefined && value !== null && !isNaN(value)) ? `${value}°C` : "N/A";
+  },
+
+  // Ajoute un point dans l'historique local
   addTemperatureSnapshot: function (status) {
     const now = Date.now();
 
@@ -127,6 +121,7 @@ Module.register("MMM-Bambulink", {
     this.pruneTemperatureHistory();
   },
 
+  // Garde uniquement les X dernières minutes
   pruneTemperatureHistory: function () {
     const minutes = (this.config.display && this.config.display.graphMinutes) || 30;
     const maxAge = minutes * 60 * 1000;
@@ -135,23 +130,52 @@ Module.register("MMM-Bambulink", {
     this.temperatureHistory = this.temperatureHistory.filter(function (point) {
       return point.ts >= cutoff;
     });
-  },
 
-  toNumberOrNull: function (value) {
-    if (value === undefined || value === null || value === "" || isNaN(value)) {
-      return null;
+    // Garde-fou supplémentaire pour éviter un historique trop long
+    if (this.temperatureHistory.length > 720) {
+      this.temperatureHistory = this.temperatureHistory.slice(-720);
     }
-    return Number(value);
   },
 
-  formatTemp: function (value) {
-    return (value !== undefined && value !== null && !isNaN(value)) ? `${value}°C` : "N/A";
+  // Crée une ligne méta d'information
+  createMetaItem: function (label, value) {
+    const item = document.createElement("div");
+    item.className = "bambu-meta-item";
+
+    const itemLabel = document.createElement("div");
+    itemLabel.className = "bambu-meta-label";
+    itemLabel.textContent = label;
+
+    const itemValue = document.createElement("div");
+    itemValue.className = "bambu-meta-value";
+    itemValue.textContent = value;
+
+    item.appendChild(itemLabel);
+    item.appendChild(itemValue);
+
+    return item;
   },
 
-  /*
-   * Fabrique une carte température réutilisable.
-   * On reste sur les mêmes données qu'avant, mais avec une hiérarchie visuelle claire.
-   */
+  // Crée un élément de légende pour le graphe
+  createLegendItem: function (label, color) {
+    const item = document.createElement("div");
+    item.className = "bambu-legend-item";
+
+    const dot = document.createElement("span");
+    dot.className = "bambu-legend-dot";
+    dot.style.backgroundColor = color;
+
+    const text = document.createElement("span");
+    text.className = "bambu-legend-text";
+    text.textContent = label;
+
+    item.appendChild(dot);
+    item.appendChild(text);
+
+    return item;
+  },
+
+  // Crée une carte température au format vertical
   createTemperatureCard: function (label, currentValue, targetValue, colorClass, accentColor) {
     const card = document.createElement("div");
     card.className = `bambu-temp-card ${colorClass}`;
@@ -204,10 +228,33 @@ Module.register("MMM-Bambulink", {
     return card;
   },
 
-  /*
-   * Dessine le graphe températures / temps dans un canvas natif.
-   * Pas de dépendance externe, donc intégration simple côté MagicMirror.
-   */
+  // Convertit un HEX en rgba
+  hexToRgba: function (hex, alpha) {
+    const sanitized = String(hex || "").replace("#", "").trim();
+    const full = sanitized.length === 3
+      ? sanitized.split("").map(char => char + char).join("")
+      : sanitized.substring(0, 6);
+
+    const r = parseInt(full.substring(0, 2), 16) || 255;
+    const g = parseInt(full.substring(2, 4), 16) || 255;
+    const b = parseInt(full.substring(4, 6), 16) || 255;
+
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  },
+
+  // Dessine un rectangle arrondi pour le fond du canvas
+  roundRect: function (ctx, x, y, width, height, radius) {
+    const r = Math.min(radius, width / 2, height / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + width, y, x + width, y + height, r);
+    ctx.arcTo(x + width, y + height, x, y + height, r);
+    ctx.arcTo(x, y + height, x, y, r);
+    ctx.arcTo(x, y, x + width, y, r);
+    ctx.closePath();
+  },
+
+  // Dessine le graphe des températures sur les X dernières minutes
   drawTemperatureGraph: function (canvas) {
     if (!canvas) {
       return;
@@ -217,7 +264,7 @@ Module.register("MMM-Bambulink", {
     const display = this.config.display || {};
     const colors = this.config.temperatureColors || {};
 
-    const width = canvas.clientWidth || 420;
+    const width = Math.max(canvas.clientWidth || 0, display.width || 320);
     const height = display.graphHeight || 120;
 
     canvas.width = width;
@@ -232,8 +279,8 @@ Module.register("MMM-Bambulink", {
 
     const padding = {
       top: 10,
-      right: 10,
-      bottom: 22,
+      right: 8,
+      bottom: 20,
       left: 28
     };
 
@@ -269,7 +316,9 @@ Module.register("MMM-Bambulink", {
     const allValues = [];
     series.forEach(function (s) {
       s.values.forEach(function (point) {
-        allValues.push(point.value);
+        if (point.ts >= minTs) {
+          allValues.push(point.value);
+        }
       });
     });
 
@@ -278,7 +327,7 @@ Module.register("MMM-Bambulink", {
       ctx.fillStyle = "rgba(255,255,255,0.45)";
       ctx.font = `${display.fontSizes?.graphLabel || 10}px Arial`;
       ctx.textAlign = "center";
-      ctx.fillText("Aucune donnée de température", width / 2, height / 2);
+      ctx.fillText("Aucune donnée", width / 2, height / 2);
       ctx.restore();
       return;
     }
@@ -303,7 +352,7 @@ Module.register("MMM-Bambulink", {
       return padding.top + graphHeight - (ratio * graphHeight);
     };
 
-    // Fond du graphe
+    // Fond léger
     ctx.save();
     ctx.fillStyle = "rgba(255,255,255,0.03)";
     this.roundRect(ctx, 0.5, 0.5, width - 1, height - 1, 10);
@@ -324,7 +373,8 @@ Module.register("MMM-Bambulink", {
         ctx.stroke();
       }
 
-      for (let i = 0; i <= maxMinutes; i += 5) {
+      const xStep = maxMinutes >= 20 ? 5 : 2;
+      for (let i = 0; i <= maxMinutes; i += xStep) {
         const x = padding.left + (graphWidth * (i / maxMinutes));
         ctx.beginPath();
         ctx.moveTo(x, padding.top);
@@ -334,9 +384,9 @@ Module.register("MMM-Bambulink", {
       ctx.restore();
     }
 
-    // Axe Y : repères simples
+    // Repères Y
     ctx.save();
-    ctx.fillStyle = "rgba(255,255,255,0.50)";
+    ctx.fillStyle = "rgba(255,255,255,0.48)";
     ctx.font = `${display.fontSizes?.graphLabel || 10}px Arial`;
     ctx.textAlign = "right";
     ctx.textBaseline = "middle";
@@ -344,31 +394,33 @@ Module.register("MMM-Bambulink", {
     for (let i = 0; i <= 4; i++) {
       const value = minValue + ((maxValue - minValue) * (4 - i) / 4);
       const y = padding.top + (graphHeight / 4) * i;
-      ctx.fillText(`${Math.round(value)}°`, padding.left - 6, y);
+      ctx.fillText(`${Math.round(value)}°`, padding.left - 5, y);
     }
     ctx.restore();
 
-    // Axe X : minutes
+    // Repères X
     ctx.save();
-    ctx.fillStyle = "rgba(255,255,255,0.50)";
+    ctx.fillStyle = "rgba(255,255,255,0.48)";
     ctx.font = `${display.fontSizes?.graphLabel || 10}px Arial`;
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
 
-    for (let i = 0; i <= maxMinutes; i += 5) {
+    const xStep = maxMinutes >= 20 ? 5 : 2;
+    for (let i = 0; i <= maxMinutes; i += xStep) {
       const x = padding.left + (graphWidth * (i / maxMinutes));
       const label = `${maxMinutes - i}m`;
-      ctx.fillText(label, x, padding.top + graphHeight + 6);
+      ctx.fillText(label, x, padding.top + graphHeight + 5);
     }
     ctx.restore();
 
-    // Séries
     const lineWidth = display.graphLineWidth || 2;
     const showFill = display.graphShowFill !== false;
     const showDots = display.graphShowDots === true;
 
     series.forEach((serie) => {
-      if (!serie.values.length) {
+      const visibleValues = serie.values.filter(point => point.ts >= minTs);
+
+      if (!visibleValues.length) {
         return;
       }
 
@@ -379,7 +431,7 @@ Module.register("MMM-Bambulink", {
       ctx.lineCap = "round";
 
       ctx.beginPath();
-      serie.values.forEach((point, index) => {
+      visibleValues.forEach((point, index) => {
         const x = xFromTs(point.ts);
         const y = yFromValue(point.value);
 
@@ -391,13 +443,13 @@ Module.register("MMM-Bambulink", {
       });
       ctx.stroke();
 
-      if (showFill && serie.values.length > 1) {
+      if (showFill && visibleValues.length > 1) {
         const gradient = ctx.createLinearGradient(0, padding.top, 0, padding.top + graphHeight);
         gradient.addColorStop(0, this.hexToRgba(serie.color, 0.18));
         gradient.addColorStop(1, this.hexToRgba(serie.color, 0.01));
 
         ctx.beginPath();
-        serie.values.forEach((point, index) => {
+        visibleValues.forEach((point, index) => {
           const x = xFromTs(point.ts);
           const y = yFromValue(point.value);
 
@@ -408,8 +460,8 @@ Module.register("MMM-Bambulink", {
           }
         });
 
-        const lastX = xFromTs(serie.values[serie.values.length - 1].ts);
-        const firstX = xFromTs(serie.values[0].ts);
+        const lastX = xFromTs(visibleValues[visibleValues.length - 1].ts);
+        const firstX = xFromTs(visibleValues[0].ts);
 
         ctx.lineTo(lastX, padding.top + graphHeight);
         ctx.lineTo(firstX, padding.top + graphHeight);
@@ -420,7 +472,7 @@ Module.register("MMM-Bambulink", {
       }
 
       if (showDots) {
-        serie.values.forEach((point) => {
+        visibleValues.forEach((point) => {
           const x = xFromTs(point.ts);
           const y = yFromValue(point.value);
 
@@ -428,11 +480,6 @@ Module.register("MMM-Bambulink", {
           ctx.arc(x, y, 2.5, 0, Math.PI * 2);
           ctx.fillStyle = serie.color;
           ctx.fill();
-
-          ctx.beginPath();
-          ctx.arc(x, y, 4, 0, Math.PI * 2);
-          ctx.strokeStyle = this.hexToRgba(serie.color, 0.25);
-          ctx.stroke();
         });
       }
 
@@ -440,44 +487,7 @@ Module.register("MMM-Bambulink", {
     });
   },
 
-  roundRect: function (ctx, x, y, width, height, radius) {
-    const r = Math.min(radius, width / 2, height / 2);
-    ctx.beginPath();
-    ctx.moveTo(x + r, y);
-    ctx.arcTo(x + width, y, x + width, y + height, r);
-    ctx.arcTo(x + width, y + height, x, y + height, r);
-    ctx.arcTo(x, y + height, x, y, r);
-    ctx.arcTo(x, y, x + width, y, r);
-    ctx.closePath();
-  },
-
-  hexToRgba: function (hex, alpha) {
-    const sanitized = String(hex || "").replace("#", "").trim();
-    const full = sanitized.length === 3
-      ? sanitized.split("").map(char => char + char).join("")
-      : sanitized.substring(0, 6);
-
-    const r = parseInt(full.substring(0, 2), 16) || 255;
-    const g = parseInt(full.substring(2, 4), 16) || 255;
-    const b = parseInt(full.substring(4, 6), 16) || 255;
-
-    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-  },
-
-  /*
-   * Hook DOM : une fois le DOM injecté par MagicMirror, on dessine le graphe.
-   */
-  notificationReceived: function () {
-    // Intentionnellement vide.
-  },
-
-  /*
-   * Après chaque updateDom, on redessine le canvas si présent.
-   */
-  onDomObjectsCreated: function () {
-    this.renderGraphLater();
-  },
-
+  // Redessine le graphe après insertion DOM
   renderGraphLater: function () {
     const self = this;
     setTimeout(function () {
@@ -485,22 +495,19 @@ Module.register("MMM-Bambulink", {
       if (canvas) {
         self.drawTemperatureGraph(canvas);
       }
-    }, 50);
+    }, 60);
   },
 
   getDom: function () {
     const wrapper = document.createElement("div");
     wrapper.className = "mmm-bambulink";
 
-    /*
-     * Variables CSS dynamiques pour piloter facilement la taille d'affichage
-     * et les couleurs sans toucher au mapping de données.
-     */
     const display = this.config.display || {};
     const fontSizes = display.fontSizes || {};
     const tempColors = this.config.temperatureColors || {};
 
     wrapper.style.setProperty("--bambu-scale", display.scale || 1);
+    wrapper.style.setProperty("--bambu-width", `${display.width || 320}px`);
     wrapper.style.setProperty("--bambu-base-font-size", `${fontSizes.base || 12}px`);
     wrapper.style.setProperty("--bambu-status-font-size", `${fontSizes.status || 14}px`);
     wrapper.style.setProperty("--bambu-meta-font-size", `${fontSizes.meta || 11}px`);
@@ -508,7 +515,7 @@ Module.register("MMM-Bambulink", {
     wrapper.style.setProperty("--bambu-temp-target-font-size", `${fontSizes.temperatureTarget || 11}px`);
     wrapper.style.setProperty("--bambu-graph-label-font-size", `${fontSizes.graphLabel || 10}px`);
     wrapper.style.setProperty("--bambu-radius", `${display.borderRadius || 14}px`);
-    wrapper.style.setProperty("--bambu-content-gap", `${display.contentGap || 10}px`);
+    wrapper.style.setProperty("--bambu-content-gap", `${display.contentGap || 8}px`);
     wrapper.style.setProperty("--bambu-section-gap", `${display.sectionGap || 8}px`);
     wrapper.style.setProperty("--bambu-nozzle-color", tempColors.nozzle || "#ff4d4f");
     wrapper.style.setProperty("--bambu-bed-color", tempColors.bed || "#ff9f1a");
@@ -529,15 +536,13 @@ Module.register("MMM-Bambulink", {
     const container = document.createElement("div");
     container.className = "bambu-container";
 
-    // En-tête principal
+    // En-tête vertical
     const header = document.createElement("div");
-    header.className = "bambu-header";
-
-    const headerMain = document.createElement("div");
-    headerMain.className = "bambu-header-main";
+    header.className = "bambu-header bambu-panel";
 
     const state = s.state || "Inconnu";
     const name = s.subtask_name || "—";
+    const percent = (s.progress !== undefined) ? `${s.progress}%` : "N/A";
 
     const statusLine = document.createElement("div");
     statusLine.className = "bambu-status-line";
@@ -547,13 +552,6 @@ Module.register("MMM-Bambulink", {
     jobLine.className = "bambu-job-line";
     jobLine.textContent = `Job: ${name}`;
 
-    headerMain.appendChild(statusLine);
-    headerMain.appendChild(jobLine);
-
-    const progressBlock = document.createElement("div");
-    progressBlock.className = "bambu-progress-block";
-
-    const percent = (s.progress !== undefined) ? `${s.progress}%` : "N/A";
     const progressValue = document.createElement("div");
     progressValue.className = "bambu-progress-value";
     progressValue.textContent = percent;
@@ -571,36 +569,35 @@ Module.register("MMM-Bambulink", {
     progressBarFill.style.width = `${progressNumber}%`;
 
     progressBar.appendChild(progressBarFill);
-    progressBlock.appendChild(progressValue);
-    progressBlock.appendChild(progressBar);
 
-    header.appendChild(headerMain);
-    header.appendChild(progressBlock);
+    header.appendChild(statusLine);
+    header.appendChild(jobLine);
+    header.appendChild(progressValue);
+    header.appendChild(progressBar);
 
-    // Méta infos
-    const metaGrid = document.createElement("div");
-    metaGrid.className = "bambu-meta-grid";
+    // Méta infos verticales
+    const metaPanel = document.createElement("div");
+    metaPanel.className = "bambu-meta-panel bambu-panel";
 
     const layers = (s.layer_num !== undefined && s.total_layer_num !== undefined)
       ? `${s.layer_num}/${s.total_layer_num}`
       : "N/A";
     const remaining = formatMinutesToDHM(s.remaining_time);
 
-    metaGrid.appendChild(this.createMetaItem("Couches", layers));
-
-    metaGrid.appendChild(this.createMetaItem("Temps restant", remaining));
+    metaPanel.appendChild(this.createMetaItem("Couches", layers));
+    metaPanel.appendChild(this.createMetaItem("Temps restant", remaining));
 
     if (s.speed_mag !== undefined || s.speed_level !== undefined) {
       const mag = (s.speed_mag !== undefined) ? `${s.speed_mag}%` : "N/A";
       const lvlLabel = speedLevelLabel(s.speed_level);
-      metaGrid.appendChild(this.createMetaItem("Vitesse", `${mag} (${lvlLabel})`));
+      metaPanel.appendChild(this.createMetaItem("Vitesse", `${mag} (${lvlLabel})`));
     }
 
     if (s.wifi_signal) {
-      metaGrid.appendChild(this.createMetaItem("WiFi", s.wifi_signal));
+      metaPanel.appendChild(this.createMetaItem("WiFi", s.wifi_signal));
     }
 
-    // Températures
+    // Températures en pile verticale
     const temperatureSection = document.createElement("div");
     temperatureSection.className = "bambu-temperature-section";
 
@@ -638,55 +635,56 @@ Module.register("MMM-Bambulink", {
 
     // AMS
     if (s.ams_tray_now !== undefined || s.ams_humidity !== undefined || s.ams_temp !== undefined) {
-      const amsLine = document.createElement("div");
-      amsLine.className = "bambu-ams-line bambu-panel";
+      const amsPanel = document.createElement("div");
+      amsPanel.className = "bambu-ams-line bambu-panel";
 
-      const left = document.createElement("div");
-      left.className = "bambu-ams-left";
+      const slotRow = document.createElement("div");
+      slotRow.className = "bambu-ams-slot-row";
 
       const slotSpan = document.createElement("span");
       slotSpan.textContent = (s.ams_tray_now !== undefined)
         ? `Slot ${s.ams_tray_now}: ${s.ams_tray_type || "Inconnu"}`
         : "AMS";
-      left.appendChild(slotSpan);
+      slotRow.appendChild(slotSpan);
 
       if (s.ams_tray_color) {
         const colorBox = document.createElement("span");
         colorBox.className = "bambu-ams-color-box";
         const rgb = s.ams_tray_color.replace("#", "").substring(0, 6);
         colorBox.style.backgroundColor = "#" + rgb;
-        left.appendChild(colorBox);
+        slotRow.appendChild(colorBox);
       }
 
-      const right = document.createElement("div");
-      right.className = "bambu-ams-right";
+      amsPanel.appendChild(slotRow);
 
-      const parts = [];
       if (s.ams_humidity !== undefined) {
-        parts.push(`Humidité: ${s.ams_humidity}%`);
+        const humidityLine = document.createElement("div");
+        humidityLine.className = "bambu-ams-detail";
+        humidityLine.textContent = `Humidité: ${s.ams_humidity}%`;
+        amsPanel.appendChild(humidityLine);
       }
-      if (s.ams_temp !== undefined) {
-        parts.push(`Temp: ${s.ams_temp}°C`);
-      }
-      right.textContent = parts.join(" – ");
 
-      amsLine.appendChild(left);
-      amsLine.appendChild(right);
+      if (s.ams_temp !== undefined) {
+        const tempLine = document.createElement("div");
+        tempLine.className = "bambu-ams-detail";
+        tempLine.textContent = `Temp: ${s.ams_temp}°C`;
+        amsPanel.appendChild(tempLine);
+      }
 
       container.appendChild(header);
-      container.appendChild(metaGrid);
+      container.appendChild(metaPanel);
       container.appendChild(temperatureSection);
-      container.appendChild(amsLine);
+      container.appendChild(amsPanel);
     } else {
       container.appendChild(header);
-      container.appendChild(metaGrid);
+      container.appendChild(metaPanel);
       container.appendChild(temperatureSection);
     }
 
-    // Graphe des températures
+    // Graphe vertical
     if (display.showGraph !== false) {
       const graphPanel = document.createElement("div");
-      graphPanel.className = "bambu-graph-panel";
+      graphPanel.className = "bambu-graph-panel bambu-panel";
 
       if (display.graphShowLegend !== false) {
         const legend = document.createElement("div");
@@ -713,46 +711,9 @@ Module.register("MMM-Bambulink", {
 
     wrapper.appendChild(container);
 
-    // Redessine le graphe après insertion dans le DOM.
     this.renderGraphLater();
 
     return wrapper;
-  },
-
-  createMetaItem: function (label, value) {
-    const item = document.createElement("div");
-    item.className = "bambu-meta-item";
-
-    const itemLabel = document.createElement("div");
-    itemLabel.className = "bambu-meta-label";
-    itemLabel.textContent = label;
-
-    const itemValue = document.createElement("div");
-    itemValue.className = "bambu-meta-value";
-    itemValue.textContent = value;
-
-    item.appendChild(itemLabel);
-    item.appendChild(itemValue);
-
-    return item;
-  },
-
-  createLegendItem: function (label, color) {
-    const item = document.createElement("div");
-    item.className = "bambu-legend-item";
-
-    const dot = document.createElement("span");
-    dot.className = "bambu-legend-dot";
-    dot.style.backgroundColor = color;
-
-    const text = document.createElement("span");
-    text.className = "bambu-legend-text";
-    text.textContent = label;
-
-    item.appendChild(dot);
-    item.appendChild(text);
-
-    return item;
   },
 
   socketNotificationReceived: function (notification, payload) {
@@ -760,7 +721,7 @@ Module.register("MMM-Bambulink", {
       this.loaded = true;
       this.printerStatus = payload || {};
 
-      // Historise les températures à chaque nouveau statut reçu.
+      // Historise les températures pour alimenter le graphe
       this.addTemperatureSnapshot(this.printerStatus);
 
       this.updateDom(300);
