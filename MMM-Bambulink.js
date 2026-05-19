@@ -72,8 +72,14 @@ Module.register("MMM-Bambulink", {
   start: function () {
     this.printerStatus = null;
     this.loaded = false;
+    this.lastKnownTemps = {
+      nozzle: null,
+      bed: null,
+      chamber: null
+    };
 
     // Historique local des températures pour le graphe
+    
     this.temperatureHistory = [];
 
     // Identifiant unique par instance du module
@@ -109,17 +115,33 @@ Module.register("MMM-Bambulink", {
 
   // Ajoute un point dans l'historique local
   addTemperatureSnapshot: function (status) {
-    const now = Date.now();
+  const now = Date.now();
 
-    this.temperatureHistory.push({
-      ts: now,
-      nozzle: this.toNumberOrNull(status.nozzle_temp),
-      bed: this.toNumberOrNull(status.bed_temp),
-      chamber: this.toNumberOrNull(status.chamber_temp)
-    });
+  const nozzleValue = this.toNumberOrNull(status.nozzle_temp);
+  const bedValue = this.toNumberOrNull(status.bed_temp);
+  const chamberValue = this.toNumberOrNull(status.chamber_temp);
 
-    this.pruneTemperatureHistory();
-  },
+  // Mémorise la dernière valeur connue si une nouvelle valeur est présente
+  if (nozzleValue !== null) {
+    this.lastKnownTemps.nozzle = nozzleValue;
+  }
+  if (bedValue !== null) {
+    this.lastKnownTemps.bed = bedValue;
+  }
+  if (chamberValue !== null) {
+    this.lastKnownTemps.chamber = chamberValue;
+  }
+
+  // Construit un point complet avec les dernières valeurs connues
+  this.temperatureHistory.push({
+    ts: now,
+    nozzle: this.lastKnownTemps.nozzle,
+    bed: this.lastKnownTemps.bed,
+    chamber: this.lastKnownTemps.chamber
+  });
+
+  this.pruneTemperatureHistory();
+},
 
   // Garde uniquement les X dernières minutes
   pruneTemperatureHistory: function () {
