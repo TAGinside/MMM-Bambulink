@@ -93,6 +93,18 @@ To use this module, add it to the modules array in your config/config.js file as
 
 Once running, the module will display Bambu Lab printer information in the chosen position (e.g., top_left) on your MagicMirror.
 
+## Options
+you can choose temps colors
+temperatureColors:
+
+// "tiles" or "graph"
+
+// Printer model (H2S, A1, P2S, or Name)
+
+    display: {
+      scale: 1,
+      width: 320,
+
 # Update
 ```
 cd ~/MagicMirror/modules/MMM-Bambulink
