@@ -33,6 +33,7 @@ Module.register("MMM-Bambulink", {
     ip: "",
     accessCode: "",
     serial: "",
+    printerModel: "Bambu Lab",
     mqttPort: 8883,
     useTLS: true,
     updateInterval: 5000, // ms
@@ -162,25 +163,6 @@ Module.register("MMM-Bambulink", {
     return cell;
   },
 
-  // Crée une ligne méta d'information
-  createMetaItem: function (label, value) {
-    const item = document.createElement("div");
-    item.className = "bambu-meta-item";
-
-    const itemLabel = document.createElement("div");
-    itemLabel.className = "bambu-meta-label";
-    itemLabel.textContent = label;
-
-    const itemValue = document.createElement("div");
-    itemValue.className = "bambu-meta-value";
-    itemValue.textContent = value;
-
-    item.appendChild(itemLabel);
-    item.appendChild(itemValue);
-
-    return item;
-  },
-
   // Crée un élément de légende pour le graphe
   createLegendItem: function (label, color) {
     const item = document.createElement("div");
@@ -201,7 +183,10 @@ Module.register("MMM-Bambulink", {
   },
 
   // Crée une carte température au format vertical
-  createTemperatureCard: function (label, currentValue, targetValue, colorClass, accentColor) {
+  createTemperatureCard: function (label, currentValue, targetValue, colorClass, accentColor, options) {
+    const cardOptions = options || {};
+    const showTarget = cardOptions.showTarget !== false;
+
     const card = document.createElement("div");
     card.className = `bambu-temp-card ${colorClass}`;
     card.style.setProperty("--temp-accent", accentColor);
@@ -213,14 +198,16 @@ Module.register("MMM-Bambulink", {
     title.className = "bambu-temp-label";
     title.textContent = label;
 
-    const target = document.createElement("div");
-    target.className = "bambu-temp-target";
-    target.textContent = (targetValue !== undefined && targetValue !== null && !isNaN(targetValue))
-      ? `${targetValue}°C`
-      : "N/A";
-
     top.appendChild(title);
-    top.appendChild(target);
+
+    if (showTarget) {
+      const target = document.createElement("div");
+      target.className = "bambu-temp-target";
+      target.textContent = (targetValue !== undefined && targetValue !== null && !isNaN(targetValue))
+        ? `${targetValue}°C`
+        : "N/A";
+      top.appendChild(target);
+    }
 
     const value = document.createElement("div");
     value.className = "bambu-temp-value";
@@ -613,22 +600,27 @@ Module.register("MMM-Bambulink", {
 
     // =========================
     // Tuile synthèse principale
+    // Titre : modèle
     // Ligne 1 : État | Job | WiFi
-    // Ligne 2 : Couche | Temps | Restant
+    // Ligne 2 : Couche | Vitesse | Restant
     // Ligne 3 : Progression
     // =========================
     const summaryCard = document.createElement("div");
     summaryCard.className = "bambu-summary-card bambu-panel";
 
+    const summaryTitle = document.createElement("div");
+    summaryTitle.className = "bambu-summary-title";
+    summaryTitle.textContent = this.config.printerModel || "Bambu Lab";
+
     const state = s.state || "Inconnu";
-    const jobName = s.subtask_name || "—";
+    const jobValue = s.subtask_name || "—";
     const wifiValue = s.wifi_signal || "N/A";
 
     const layerValue = (s.layer_num !== undefined && s.total_layer_num !== undefined)
       ? `${s.layer_num}/${s.total_layer_num}`
       : "N/A";
 
-    const timeValue = (s.speed_mag !== undefined || s.speed_level !== undefined)
+    const speedValue = (s.speed_mag !== undefined || s.speed_level !== undefined)
       ? `${(s.speed_mag !== undefined && !isNaN(s.speed_mag)) ? `${s.speed_mag}%` : "N/A"} (${speedLevelLabel(s.speed_level)})`
       : "N/A";
 
@@ -646,13 +638,13 @@ Module.register("MMM-Bambulink", {
     const row1 = document.createElement("div");
     row1.className = "bambu-summary-grid bambu-summary-row-1";
     row1.appendChild(this.createSummaryCell("État", state));
-    row1.appendChild(this.createSummaryCell("Job", jobName));
+    row1.appendChild(this.createSummaryCell("Job", jobValue));
     row1.appendChild(this.createSummaryCell("WiFi", wifiValue));
 
     const row2 = document.createElement("div");
     row2.className = "bambu-summary-grid bambu-summary-row-2";
     row2.appendChild(this.createSummaryCell("Couche", layerValue));
-    row2.appendChild(this.createSummaryCell("Temps", timeValue));
+    row2.appendChild(this.createSummaryCell("Vitesse", speedValue));
     row2.appendChild(this.createSummaryCell("Restant", remainingValue));
 
     const row3 = document.createElement("div");
@@ -673,6 +665,7 @@ Module.register("MMM-Bambulink", {
     row3.appendChild(progressBig);
     row3.appendChild(progressBar);
 
+    summaryCard.appendChild(summaryTitle);
     summaryCard.appendChild(row1);
     summaryCard.appendChild(row2);
     summaryCard.appendChild(row3);
@@ -689,7 +682,8 @@ Module.register("MMM-Bambulink", {
         s.nozzle_temp,
         s.nozzle_target,
         "is-nozzle",
-        tempColors.nozzle || "#ff4d4f"
+        tempColors.nozzle || "#ff4d4f",
+        { showTarget: true }
       )
     );
 
@@ -699,7 +693,8 @@ Module.register("MMM-Bambulink", {
         s.bed_temp,
         s.bed_target,
         "is-bed",
-        tempColors.bed || "#ff9f1a"
+        tempColors.bed || "#ff9f1a",
+        { showTarget: true }
       )
     );
 
@@ -710,7 +705,8 @@ Module.register("MMM-Bambulink", {
           s.chamber_temp,
           null,
           "is-chamber",
-          tempColors.chamber || "#4da3ff"
+          tempColors.chamber || "#4da3ff",
+          { showTarget: false }
         )
       );
     }

@@ -48,6 +48,15 @@
   padding: 12px;
 }
 
+.mmm-bambulink .bambu-summary-title {
+  font-size: 11px;
+  line-height: 1.1;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.74);
+}
+
 .mmm-bambulink .bambu-summary-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -75,10 +84,6 @@
   color: rgba(255, 255, 255, 0.94);
   font-weight: 600;
   word-break: break-word;
-}
-
-.mmm-bambulink .bambu-summary-row-1 .bambu-summary-cell:nth-child(2) .bambu-summary-value {
-  font-size: 11px;
 }
 
 .mmm-bambulink .bambu-summary-progress-block {
@@ -151,6 +156,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  min-height: 14px;
 }
 
 .mmm-bambulink .bambu-temp-label {
@@ -381,7 +387,6 @@
   font-size: inherit;
 }
 
-/* Option : si tu veux un peu plus d'air sur grand écran */
 @media screen and (min-width: 500px) {
   .mmm-bambulink .bambu-summary-progress-big {
     font-size: 34px;
