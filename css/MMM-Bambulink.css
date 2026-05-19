@@ -4,13 +4,6 @@
   justify-content: flex-start;
 }
 
-.mmm-bambulink .bambu-thumbnail {
-  width: 80px;
-  height: auto;
-  margin-right: 10px;
-  border-radius: 4px;
-}
-
 .mmm-bambulink .bambu-info {
   display: flex;
   flex-direction: column;
