@@ -1,20 +1,305 @@
-.mmm-bambulink .bambu-container {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
+/* Magic Mirror
+ * Module: MMM-Bambulink
+ */
+
+.mmm-bambulink {
+  --bambu-scale: 1;
+  --bambu-base-font-size: 12px;
+  --bambu-status-font-size: 14px;
+  --bambu-meta-font-size: 11px;
+  --bambu-temp-value-font-size: 18px;
+  --bambu-temp-target-font-size: 11px;
+  --bambu-graph-label-font-size: 10px;
+  --bambu-radius: 14px;
+  --bambu-content-gap: 10px;
+  --bambu-section-gap: 8px;
+  --bambu-nozzle-color: #ff4d4f;
+  --bambu-bed-color: #ff9f1a;
+  --bambu-chamber-color: #4da3ff;
+
+  transform-origin: top left;
+  transform: scale(var(--bambu-scale));
+  width: calc(100% / var(--bambu-scale));
 }
 
+.mmm-bambulink .bambu-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--bambu-section-gap);
+  min-width: 320px;
+  max-width: 520px;
+}
+
+.mmm-bambulink .bambu-panel,
+.mmm-bambulink .bambu-header,
+.mmm-bambulink .bambu-meta-grid,
+.mmm-bambulink .bambu-graph-panel,
+.mmm-bambulink .bambu-temp-card {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--bambu-radius);
+  backdrop-filter: blur(2px);
+}
+
+.mmm-bambulink .bambu-header {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--bambu-content-gap);
+  padding: 12px;
+  align-items: center;
+}
+
+.mmm-bambulink .bambu-header-main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.mmm-bambulink .bambu-status-line {
+  font-size: var(--bambu-status-font-size);
+  line-height: 1.2;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.96);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mmm-bambulink .bambu-job-line {
+  font-size: var(--bambu-base-font-size);
+  line-height: 1.3;
+  color: rgba(255, 255, 255, 0.72);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mmm-bambulink .bambu-progress-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 96px;
+}
+
+.mmm-bambulink .bambu-progress-value {
+  font-size: 18px;
+  line-height: 1;
+  font-weight: 700;
+  text-align: right;
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.mmm-bambulink .bambu-progress-bar {
+  width: 100%;
+  height: 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.10);
+  overflow: hidden;
+}
+
+.mmm-bambulink .bambu-progress-bar-fill {
+  height: 100%;
+  width: 0;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(120, 219, 168, 0.85), rgba(52, 199, 89, 0.95));
+  transition: width 0.35s ease;
+}
+
+.mmm-bambulink .bambu-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 10px 12px;
+}
+
+.mmm-bambulink .bambu-meta-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.mmm-bambulink .bambu-meta-label {
+  font-size: var(--bambu-meta-font-size);
+  line-height: 1.2;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.mmm-bambulink .bambu-meta-value {
+  font-size: var(--bambu-base-font-size);
+  line-height: 1.3;
+  color: rgba(255, 255, 255, 0.88);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mmm-bambulink .bambu-temperature-section {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.mmm-bambulink .bambu-temp-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  min-height: 92px;
+  position: relative;
+  overflow: hidden;
+}
+
+.mmm-bambulink .bambu-temp-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 3px;
+  background: var(--temp-accent, rgba(255, 255, 255, 0.6));
+}
+
+.mmm-bambulink .bambu-temp-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.mmm-bambulink .bambu-temp-label {
+  font-size: var(--bambu-meta-font-size);
+  color: rgba(255, 255, 255, 0.58);
+  line-height: 1.2;
+}
+
+.mmm-bambulink .bambu-temp-target {
+  font-size: var(--bambu-temp-target-font-size);
+  color: rgba(255, 255, 255, 0.44);
+  line-height: 1.2;
+  text-align: right;
+}
+
+.mmm-bambulink .bambu-temp-value {
+  font-size: var(--bambu-temp-value-font-size);
+  line-height: 1;
+  font-weight: 700;
+  color: var(--temp-accent, rgba(255, 255, 255, 0.95));
+  letter-spacing: 0.02em;
+}
+
+.mmm-bambulink .bambu-temp-meter {
+  margin-top: auto;
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.mmm-bambulink .bambu-temp-meter-fill {
+  width: 0;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--temp-accent, rgba(255, 255, 255, 0.9));
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.10);
+  transition: width 0.35s ease;
+}
+
+.mmm-bambulink .bambu-temp-card.is-nozzle {
+  box-shadow: inset 0 0 0 1px rgba(255, 77, 79, 0.08);
+}
+
+.mmm-bambulink .bambu-temp-card.is-bed {
+  box-shadow: inset 0 0 0 1px rgba(255, 159, 26, 0.08);
+}
+
+.mmm-bambulink .bambu-temp-card.is-chamber {
+  box-shadow: inset 0 0 0 1px rgba(77, 163, 255, 0.08);
+}
+
+.mmm-bambulink .bambu-ams-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  font-size: var(--bambu-base-font-size);
+  line-height: 1.35;
+  color: rgba(255, 255, 255, 0.88);
+  flex-wrap: wrap;
+}
+
+.mmm-bambulink .bambu-ams-left,
+.mmm-bambulink .bambu-ams-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.mmm-bambulink .bambu-ams-right {
+  color: rgba(255, 255, 255, 0.62);
+}
+
+.mmm-bambulink .bambu-ams-color-box {
+  display: inline-block;
+  width: 38px;          /* ≈ 1 cm */
+  height: 1.2em;        /* hauteur proche de la taille du texte */
+  margin: 0 6px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  vertical-align: middle;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+}
+
+/* Bloc graphe températures */
+.mmm-bambulink .bambu-graph-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px 12px 12px;
+}
+
+.mmm-bambulink .bambu-graph-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.mmm-bambulink .bambu-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--bambu-meta-font-size);
+  color: rgba(255, 255, 255, 0.68);
+}
+
+.mmm-bambulink .bambu-legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  display: inline-block;
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.08);
+}
+
+.mmm-bambulink .bambu-graph-canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  min-height: 90px;
+}
+
+/* Lignes héritées / compatibilité si certaines classes sont encore utilisées ailleurs */
 .mmm-bambulink .bambu-info {
   display: flex;
   flex-direction: column;
-  font-size: 11px;
+  font-size: var(--bambu-base-font-size);
   line-height: 1.4;
 }
 
-.mmm-bambulink .bambu-status-line,
 .mmm-bambulink .bambu-progress-line,
 .mmm-bambulink .bambu-temp-line,
-.mmm-bambulink .bambu-ams-line,
 .mmm-bambulink .bambu-speed-line,
 .mmm-bambulink .bambu-net-line,
 .mmm-bambulink .bambu-chamber-line,
@@ -22,13 +307,25 @@
   margin-top: 2px;
 }
 
-/* Rectangle couleur AMS (inséré en <span class="bambu-ams-color-box"> dans le JS) */
-.mmm-bambulink .bambu-ams-color-box {
-  display: inline-block;
-  width: 38px;          /* ≈ 1 cm */
-  height: 1.2em;        /* hauteur proche de la taille du texte */
-  margin: 0 6px;
-  border-radius: 2px;
-  border: 1px solid rgba(0, 0, 0, 0.2);
-  vertical-align: middle;
+/* Responsive léger pour modules plus étroits */
+@media screen and (max-width: 480px) {
+  .mmm-bambulink .bambu-header {
+    grid-template-columns: 1fr;
+  }
+
+  .mmm-bambulink .bambu-progress-block {
+    min-width: 0;
+  }
+
+  .mmm-bambulink .bambu-progress-value {
+    text-align: left;
+  }
+
+  .mmm-bambulink .bambu-temperature-section {
+    grid-template-columns: 1fr;
+  }
+
+  .mmm-bambulink .bambu-meta-grid {
+    grid-template-columns: 1fr;
+  }
 }
