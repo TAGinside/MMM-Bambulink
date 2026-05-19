@@ -91,7 +91,7 @@ Module.register("MMM-Bambulink", {
   },
 
   getStyles: function () {
-    return ["css/MMM-Bambulink.css"];
+  return [this.file("css/MMM-Bambulink.css")];
   },
 
   // Convertit une valeur en nombre exploitable ou null
