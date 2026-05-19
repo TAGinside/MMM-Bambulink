@@ -87,7 +87,7 @@ Module.register("MMM-Bambulink", {
     // Identifiant unique par instance du module
     this.instanceId = "bambulink-" + this.identifier;
 
-    // Envoie la configuration au node_helper
+    // Envoyer la config au node_helper.
     this.sendSocketNotification("BAMBULINK_CONFIG", this.config);
 
     const self = this;
@@ -122,13 +122,11 @@ Module.register("MMM-Bambulink", {
     }
 
     const raw = String(color).replace("#", "").trim();
-
     if (!raw) {
       return null;
     }
 
     const hex = raw.substring(0, 6);
-
     if (!/^[0-9a-fA-F]{6}$/.test(hex)) {
       return null;
     }
@@ -145,50 +143,23 @@ Module.register("MMM-Bambulink", {
     return `Slot ${slotId}`;
   },
 
-  // Ajoute un point dans l'historique local
-  addTemperatureSnapshot: function (status) {
-    const now = Date.now();
+  // Crée une cellule de synthèse pour la tuile principale
+  createSummaryCell: function (label, value) {
+    const cell = document.createElement("div");
+    cell.className = "bambu-summary-cell";
 
-    const nozzleValue = this.toNumberOrNull(status.nozzle_temp);
-    const bedValue = this.toNumberOrNull(status.bed_temp);
-    const chamberValue = this.toNumberOrNull(status.chamber_temp);
+    const cellLabel = document.createElement("div");
+    cellLabel.className = "bambu-summary-label";
+    cellLabel.textContent = label;
 
-    // Mémorise la dernière valeur connue si une nouvelle valeur est présente
-    if (nozzleValue !== null) {
-      this.lastKnownTemps.nozzle = nozzleValue;
-    }
-    if (bedValue !== null) {
-      this.lastKnownTemps.bed = bedValue;
-    }
-    if (chamberValue !== null) {
-      this.lastKnownTemps.chamber = chamberValue;
-    }
+    const cellValue = document.createElement("div");
+    cellValue.className = "bambu-summary-value";
+    cellValue.textContent = value;
 
-    // Construit un point complet avec les dernières valeurs connues
-    this.temperatureHistory.push({
-      ts: now,
-      nozzle: this.lastKnownTemps.nozzle,
-      bed: this.lastKnownTemps.bed,
-      chamber: this.lastKnownTemps.chamber
-    });
+    cell.appendChild(cellLabel);
+    cell.appendChild(cellValue);
 
-    this.pruneTemperatureHistory();
-  },
-
-  // Garde uniquement les X dernières minutes
-  pruneTemperatureHistory: function () {
-    const minutes = (this.config.display && this.config.display.graphMinutes) || 30;
-    const maxAge = minutes * 60 * 1000;
-    const cutoff = Date.now() - maxAge;
-
-    this.temperatureHistory = this.temperatureHistory.filter(function (point) {
-      return point.ts >= cutoff;
-    });
-
-    // Garde-fou supplémentaire pour éviter un historique trop long
-    if (this.temperatureHistory.length > 720) {
-      this.temperatureHistory = this.temperatureHistory.slice(-720);
-    }
+    return cell;
   },
 
   // Crée une ligne méta d'information
@@ -262,7 +233,6 @@ Module.register("MMM-Bambulink", {
     meterFill.className = "bambu-temp-meter-fill";
 
     let ratio = 0;
-
     if (
       currentValue !== undefined && currentValue !== null && !isNaN(currentValue) &&
       targetValue !== undefined && targetValue !== null && !isNaN(targetValue) &&
@@ -307,6 +277,49 @@ Module.register("MMM-Bambulink", {
     ctx.arcTo(x, y + height, x, y, r);
     ctx.arcTo(x, y, x + width, y, r);
     ctx.closePath();
+  },
+
+  // Ajoute un point dans l'historique local
+  addTemperatureSnapshot: function (status) {
+    const now = Date.now();
+
+    const nozzleValue = this.toNumberOrNull(status.nozzle_temp);
+    const bedValue = this.toNumberOrNull(status.bed_temp);
+    const chamberValue = this.toNumberOrNull(status.chamber_temp);
+
+    if (nozzleValue !== null) {
+      this.lastKnownTemps.nozzle = nozzleValue;
+    }
+    if (bedValue !== null) {
+      this.lastKnownTemps.bed = bedValue;
+    }
+    if (chamberValue !== null) {
+      this.lastKnownTemps.chamber = chamberValue;
+    }
+
+    this.temperatureHistory.push({
+      ts: now,
+      nozzle: this.lastKnownTemps.nozzle,
+      bed: this.lastKnownTemps.bed,
+      chamber: this.lastKnownTemps.chamber
+    });
+
+    this.pruneTemperatureHistory();
+  },
+
+  // Garde uniquement les X dernières minutes
+  pruneTemperatureHistory: function () {
+    const minutes = (this.config.display && this.config.display.graphMinutes) || 30;
+    const maxAge = minutes * 60 * 1000;
+    const cutoff = Date.now() - maxAge;
+
+    this.temperatureHistory = this.temperatureHistory.filter(function (point) {
+      return point.ts >= cutoff;
+    });
+
+    if (this.temperatureHistory.length > 720) {
+      this.temperatureHistory = this.temperatureHistory.slice(-720);
+    }
   },
 
   // Dessine le graphe des températures sur les X dernières minutes
@@ -414,14 +427,12 @@ Module.register("MMM-Bambulink", {
       return padding.top + graphHeight - (ratio * graphHeight);
     };
 
-    // Fond léger
     ctx.save();
     ctx.fillStyle = "rgba(255,255,255,0.03)";
     this.roundRect(ctx, 0.5, 0.5, width - 1, height - 1, 10);
     ctx.fill();
     ctx.restore();
 
-    // Grille
     if (display.graphShowGrid !== false) {
       ctx.save();
       ctx.strokeStyle = "rgba(255,255,255,0.08)";
@@ -447,7 +458,6 @@ Module.register("MMM-Bambulink", {
       ctx.restore();
     }
 
-    // Repères Y
     ctx.save();
     ctx.fillStyle = "rgba(255,255,255,0.48)";
     ctx.font = `${display.fontSizes?.graphLabel || 10}px Arial`;
@@ -462,7 +472,6 @@ Module.register("MMM-Bambulink", {
 
     ctx.restore();
 
-    // Repères X
     ctx.save();
     ctx.fillStyle = "rgba(255,255,255,0.48)";
     ctx.font = `${display.fontSizes?.graphLabel || 10}px Arial`;
@@ -602,71 +611,73 @@ Module.register("MMM-Bambulink", {
     const container = document.createElement("div");
     container.className = "bambu-container";
 
-    // En-tête principal
-    const header = document.createElement("div");
-    header.className = "bambu-header bambu-panel";
+    // =========================
+    // Tuile synthèse principale
+    // Ligne 1 : État | Job | WiFi
+    // Ligne 2 : Couche | Temps | Restant
+    // Ligne 3 : Progression
+    // =========================
+    const summaryCard = document.createElement("div");
+    summaryCard.className = "bambu-summary-card bambu-panel";
 
     const state = s.state || "Inconnu";
-    const name = s.subtask_name || "—";
-    const percent = (s.progress !== undefined && !isNaN(s.progress)) ? `${s.progress}%` : "N/A";
+    const jobName = s.subtask_name || "—";
+    const wifiValue = s.wifi_signal || "N/A";
 
-    const statusLine = document.createElement("div");
-    statusLine.className = "bambu-status-line";
-    statusLine.textContent = `État: ${state}`;
+    const layerValue = (s.layer_num !== undefined && s.total_layer_num !== undefined)
+      ? `${s.layer_num}/${s.total_layer_num}`
+      : "N/A";
 
-    const jobLine = document.createElement("div");
-    jobLine.className = "bambu-job-line";
-    jobLine.textContent = `Job: ${name}`;
+    const timeValue = (s.speed_mag !== undefined || s.speed_level !== undefined)
+      ? `${(s.speed_mag !== undefined && !isNaN(s.speed_mag)) ? `${s.speed_mag}%` : "N/A"} (${speedLevelLabel(s.speed_level)})`
+      : "N/A";
 
-    const progressValue = document.createElement("div");
-    progressValue.className = "bambu-progress-value";
-    progressValue.textContent = percent;
-
-    const progressBar = document.createElement("div");
-    progressBar.className = "bambu-progress-bar";
-
-    const progressBarFill = document.createElement("div");
-    progressBarFill.className = "bambu-progress-bar-fill";
+    const remainingValue = formatMinutesToDHM(s.remaining_time);
 
     let progressNumber = 0;
     if (s.progress !== undefined && !isNaN(s.progress)) {
       progressNumber = Math.max(0, Math.min(100, Number(s.progress)));
     }
+
+    const progressValue = (s.progress !== undefined && !isNaN(s.progress))
+      ? `${s.progress}%`
+      : "N/A";
+
+    const row1 = document.createElement("div");
+    row1.className = "bambu-summary-grid bambu-summary-row-1";
+    row1.appendChild(this.createSummaryCell("État", state));
+    row1.appendChild(this.createSummaryCell("Job", jobName));
+    row1.appendChild(this.createSummaryCell("WiFi", wifiValue));
+
+    const row2 = document.createElement("div");
+    row2.className = "bambu-summary-grid bambu-summary-row-2";
+    row2.appendChild(this.createSummaryCell("Couche", layerValue));
+    row2.appendChild(this.createSummaryCell("Temps", timeValue));
+    row2.appendChild(this.createSummaryCell("Restant", remainingValue));
+
+    const row3 = document.createElement("div");
+    row3.className = "bambu-summary-progress-block";
+
+    const progressBig = document.createElement("div");
+    progressBig.className = "bambu-summary-progress-big";
+    progressBig.textContent = progressValue;
+
+    const progressBar = document.createElement("div");
+    progressBar.className = "bambu-progress-bar bambu-progress-bar-bottom";
+
+    const progressBarFill = document.createElement("div");
+    progressBarFill.className = "bambu-progress-bar-fill";
     progressBarFill.style.width = `${progressNumber}%`;
 
     progressBar.appendChild(progressBarFill);
+    row3.appendChild(progressBig);
+    row3.appendChild(progressBar);
 
-    header.appendChild(statusLine);
-    header.appendChild(jobLine);
-    header.appendChild(progressValue);
-    header.appendChild(progressBar);
+    summaryCard.appendChild(row1);
+    summaryCard.appendChild(row2);
+    summaryCard.appendChild(row3);
 
-    container.appendChild(header);
-
-    // Méta informations
-    const metaPanel = document.createElement("div");
-    metaPanel.className = "bambu-meta-panel bambu-panel";
-
-    const layers = (s.layer_num !== undefined && s.total_layer_num !== undefined)
-      ? `${s.layer_num}/${s.total_layer_num}`
-      : "N/A";
-
-    const remaining = formatMinutesToDHM(s.remaining_time);
-
-    metaPanel.appendChild(this.createMetaItem("Couches", layers));
-    metaPanel.appendChild(this.createMetaItem("Temps restant", remaining));
-
-    if (s.speed_mag !== undefined || s.speed_level !== undefined) {
-      const mag = (s.speed_mag !== undefined && !isNaN(s.speed_mag)) ? `${s.speed_mag}%` : "N/A";
-      const lvlLabel = speedLevelLabel(s.speed_level);
-      metaPanel.appendChild(this.createMetaItem("Vitesse", `${mag} (${lvlLabel})`));
-    }
-
-    if (s.wifi_signal) {
-      metaPanel.appendChild(this.createMetaItem("WiFi", s.wifi_signal));
-    }
-
-    container.appendChild(metaPanel);
+    container.appendChild(summaryCard);
 
     // Températures
     const temperatureSection = document.createElement("div");
@@ -721,7 +732,6 @@ Module.register("MMM-Bambulink", {
       amsTitle.textContent = "AMS";
       amsPanel.appendChild(amsTitle);
 
-      // Humidité / température en 2 colonnes
       const amsMetaGrid = document.createElement("div");
       amsMetaGrid.className = "bambu-ams-meta-grid";
 
@@ -763,7 +773,6 @@ Module.register("MMM-Bambulink", {
         amsPanel.appendChild(amsMetaGrid);
       }
 
-      // Slots AMS
       if (Array.isArray(s.ams_slots) && s.ams_slots.length > 0) {
         const slotsGrid = document.createElement("div");
         slotsGrid.className = "bambu-ams-slots-grid";
