@@ -66,11 +66,11 @@ modules: [
   module: "MMM-Bambulink",
   position: "top_left",
   config: {
-    ip: "192.168.1.x",			  // IP address of the printer
-    accessCode: "xxxxxxxx",	  // LAN Connection Code
-    serial: "XXXXXXXX",		    // Serial number of the printer
-	  updateInterval: 5000,			// Refeshtime in ms
-    printerModel: "H2S",      // Printer model (H2S, A1, P2S, or Name)
+    ip: "192.168.1.x",			 	 // IP address of the printer
+    accessCode: "xxxxxxxx",	  		// LAN Connection Code
+    serial: "XXXXXXXX",		    	// Serial number of the printer
+	updateInterval: 5000,			// Refeshtime in ms
+    printerModel: "H2S",     		 // Printer model (H2S, A1, P2S, or Name)
 	temperatureDisplayMode: "tiles", // "tiles" or "graph"
 
     display: {
