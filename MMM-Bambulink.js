@@ -38,12 +38,16 @@ Module.register("MMM-Bambulink", {
     useTLS: true,
     updateInterval: 5000, // ms
 
+    // Mode d'affichage des températures :
+    // "tiles" = affiche Buse / Lit / Chambre
+    // "graph" = affiche uniquement le graphique
+    temperatureDisplayMode: "tiles",
+
     // Configuration UX/UI uniquement
     display: {
       scale: 1,
       width: 320,
       compact: true,
-      showGraph: true,
       graphHeight: 120,
       graphMinutes: 30,
       graphLineWidth: 2,
@@ -142,6 +146,12 @@ Module.register("MMM-Bambulink", {
       return `Slot ${num + 1}`;
     }
     return `Slot ${slotId}`;
+  },
+
+  // Normalise le mode d'affichage des températures
+  getTemperatureDisplayMode: function () {
+    const mode = String(this.config.temperatureDisplayMode || "tiles").toLowerCase();
+    return (mode === "graph") ? "graph" : "tiles";
   },
 
   // Crée une cellule de synthèse pour la tuile principale
@@ -568,6 +578,7 @@ Module.register("MMM-Bambulink", {
     const display = this.config.display || {};
     const fontSizes = display.fontSizes || {};
     const tempColors = this.config.temperatureColors || {};
+    const temperatureDisplayMode = this.getTemperatureDisplayMode();
 
     wrapper.style.setProperty("--bambu-scale", display.scale || 1);
     wrapper.style.setProperty("--bambu-width", `${display.width || 320}px`);
@@ -672,46 +683,50 @@ Module.register("MMM-Bambulink", {
 
     container.appendChild(summaryCard);
 
-    // Températures
-    const temperatureSection = document.createElement("div");
-    temperatureSection.className = "bambu-temperature-section";
+    // =========================
+    // Températures : un seul mode à la fois
+    // =========================
+    if (temperatureDisplayMode === "tiles") {
+      const temperatureSection = document.createElement("div");
+      temperatureSection.className = "bambu-temperature-section";
 
-    temperatureSection.appendChild(
-      this.createTemperatureCard(
-        "Buse",
-        s.nozzle_temp,
-        s.nozzle_target,
-        "is-nozzle",
-        tempColors.nozzle || "#ff4d4f",
-        { showTarget: true }
-      )
-    );
-
-    temperatureSection.appendChild(
-      this.createTemperatureCard(
-        "Lit",
-        s.bed_temp,
-        s.bed_target,
-        "is-bed",
-        tempColors.bed || "#ff9f1a",
-        { showTarget: true }
-      )
-    );
-
-    if (s.chamber_temp !== undefined && s.chamber_temp !== null && s.chamber_temp !== "") {
       temperatureSection.appendChild(
         this.createTemperatureCard(
-          "Chambre",
-          s.chamber_temp,
-          null,
-          "is-chamber",
-          tempColors.chamber || "#4da3ff",
-          { showTarget: false }
+          "Buse",
+          s.nozzle_temp,
+          s.nozzle_target,
+          "is-nozzle",
+          tempColors.nozzle || "#ff4d4f",
+          { showTarget: true }
         )
       );
-    }
 
-    container.appendChild(temperatureSection);
+      temperatureSection.appendChild(
+        this.createTemperatureCard(
+          "Lit",
+          s.bed_temp,
+          s.bed_target,
+          "is-bed",
+          tempColors.bed || "#ff9f1a",
+          { showTarget: true }
+        )
+      );
+
+      if (s.chamber_temp !== undefined && s.chamber_temp !== null && s.chamber_temp !== "") {
+        temperatureSection.appendChild(
+          this.createTemperatureCard(
+            "Chambre",
+            s.chamber_temp,
+            null,
+            "is-chamber",
+            tempColors.chamber || "#4da3ff",
+            { showTarget: false }
+          )
+        );
+      }
+
+      container.appendChild(temperatureSection);
+    }
 
     // AMS
     if (
@@ -815,8 +830,8 @@ Module.register("MMM-Bambulink", {
       container.appendChild(amsPanel);
     }
 
-    // Graphe
-    if (display.showGraph !== false) {
+    // Graphe uniquement si le mode demandé est "graph"
+    if (temperatureDisplayMode === "graph") {
       const graphPanel = document.createElement("div");
       graphPanel.className = "bambu-graph-panel bambu-panel";
 
@@ -845,7 +860,9 @@ Module.register("MMM-Bambulink", {
 
     wrapper.appendChild(container);
 
-    this.renderGraphLater();
+    if (temperatureDisplayMode === "graph") {
+      this.renderGraphLater();
+    }
 
     return wrapper;
   },
