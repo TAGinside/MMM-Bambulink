@@ -502,10 +502,6 @@ Module.register("MMM-Bambulink", {
     const wrapper = document.createElement("div");
     wrapper.className = "mmm-bambulink";
 
-    wrapper.style.border = "3px solid red";
-    wrapper.style.padding = "10px";
-    wrapper.style.background = "rgba(255,0,0,0.15)"
-
     const display = this.config.display || {};
     const fontSizes = display.fontSizes || {};
     const tempColors = this.config.temperatureColors || {};
