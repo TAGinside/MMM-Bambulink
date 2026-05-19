@@ -76,14 +76,6 @@ Module.register("MMM-Bambulink", {
     const container = document.createElement("div");
     container.className = "bambu-container";
 
-    if (this.config.showThumbnail) {
-      const img = document.createElement("img");
-      img.className = "bambu-thumbnail";
-      img.src = this.config.thumbnailPath;
-      img.alt = "Bambu Lab";
-      container.appendChild(img);
-    }
-
     const info = document.createElement("div");
     info.className = "bambu-info";
 
