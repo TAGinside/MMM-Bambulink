@@ -7,7 +7,7 @@ MMM-Bambulink is a third-party module for MagicMirror² designed to display info
 
 **NOT NEED ONLY LAN MODE**
 
-![Example.png](thumbnails/Example.png) 
+![Example.png](thumbnails/Example-1.png) 
 
 ## Key Requirements
 To use this module, you need:
