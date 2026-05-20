@@ -1,7 +1,7 @@
 # Bambulink Module for MagicMirror
 Module: MMM-Bambulink
 
-This [MagicMirror](https://github.com/MichMich/MagicMirror) module,
+This [MagicMirror](https://github.com/MagicMirrorOrg/MagicMirror) module,
 
 MMM-Bambulink is a third-party module for MagicMirror² designed to display information about your Bambu Lab printer directly on your MagicMirror screen. The module connects to your printer over the local network using Bambu Lab’s LAN credentials and updates information automatically at a configurable interval.
 
