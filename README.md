@@ -43,7 +43,7 @@ The project is still evolving, especially in terms of UI improvements, advanced 
 
 ## Compatibility
 
-MMM-Bambulink is designed for **MagicMirror²** and **Bambu Lab printers** with **LAN mode enabled**.
+MMM-Bambulink is designed for **MagicMirror²** and **Bambu Lab printers** without **LAN mode enabled**.
 
 The required parameters such as `ip`, `accessCode`, `serial`, `mqttPort`, and `useTLS` indicate that the module is intended to communicate with the printer locally through a secure network connection. 
 
@@ -73,7 +73,6 @@ Install the Node.js dependencies:
 npm install
 ```
 
-MagicMirror’s module guides recommend keeping installation steps simple and directly copyable from the README. [web:268][web:260]
 
 ## Configuration
 
@@ -109,7 +108,7 @@ modules: [
 ]
 ```
 
-MagicMirror² modules are configured through `config/config.js`, where each module is added to the `modules` array with its own `config` object. [web:134][web:267]
+MagicMirror² modules are configured through `config/config.js`, where each module is added to the `modules` array with its own `config` object.
 
 ## How to Use
 
@@ -142,10 +141,6 @@ It allows you to quickly monitor an active print, confirm that the printer is re
 
 ## About
 
-MMM-Bambulink brings Bambu Lab printer monitoring directly into MagicMirror², making it possible to integrate 3D printing status into a broader smart home, workshop, or technical dashboard.
-
-The module is open source and free to use and modify. For more information, updates, or contributions, visit the GitHub repository:
-
-[https://github.com/TAGinside/MMM-Bambulink](https://github.com/TAGinside/MMM-Bambulink)
+The module is open source and free to use and modify.
 
 Feedback is always welcome, especially for printer compatibility, AMS behavior, and display improvements.
