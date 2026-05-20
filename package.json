@@ -2,7 +2,6 @@
   "name": "MMM-Bambulink",
   "version": "0.2.0",
   "description": "MagicMirror² module to display Bambu Lab printer status via local MQTT.",
-  "main": "MMM-Bambulink.js",
   "keywords": [
     "MagicMirror",
     "MagicMirror2",
