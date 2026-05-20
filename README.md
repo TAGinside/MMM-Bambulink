@@ -103,7 +103,7 @@ Add the module to the `modules` array in your `config/config.js` file:
         chamber: "#4da3ff"              // Blue
       }
     }
-  }
+  },
 ```
 
 MagicMirror² modules are configured through `config/config.js`, where each module is added to the `modules` array with its own `config` object.
