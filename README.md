@@ -41,6 +41,8 @@ The module is functional and ready to use in a standard MagicMirror² environmen
 
 The project is still evolving, especially in terms of UI improvements, advanced display options, and visual customization.
 
+You can support my work here -> [<img src="thumbnails/bmc_qr.png" alt="Buy me a coffee" width="20">](https://buymeacoffee.com/taginside)
+
 ## Compatibility
 
 MMM-Bambulink is designed for **MagicMirror²** and **Bambu Lab printers** without **LAN mode enabled**.
@@ -126,7 +128,7 @@ npm ci
 
 Then restart MagicMirror².
 
-You can support my work here -> ![Buymeacoffee.png](thumbnails/bmc_qr.png)
+You can support my work here -> <img src="thumbnails/bmc_qr.png" alt="Buy me a coffee" width="100">
 [Buymeacoffee](https://buymeacoffee.com/taginside)
 
 ## Use Cases
