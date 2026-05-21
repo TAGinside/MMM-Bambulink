@@ -1,4 +1,4 @@
-# Bambulink Module for MagicMirror
+# Bambulink Module for MagicMirror [![GitHub license](https://img.shields.io/badge/license-MIT-blue.svg?style=flat)]
 Module: MMM-Bambulink
 
 This [MagicMirror](https://github.com/MagicMirrorOrg/MagicMirror) module,
