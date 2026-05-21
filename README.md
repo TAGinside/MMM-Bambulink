@@ -126,6 +126,8 @@ npm ci
 
 Then restart MagicMirror².
 
+You can support my work here -> [Buymeacoffee](https://buymeacoffee.com/taginside)
+
 ## Use Cases
 
 MMM-Bambulink is especially useful in:
