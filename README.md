@@ -126,7 +126,8 @@ npm ci
 
 Then restart MagicMirror².
 
-You can support my work here -> [Buymeacoffee](https://buymeacoffee.com/taginside)
+You can support my work here -> ![Buymeacoffee.png](thumbnails/bmc_qr.png)
+[Buymeacoffee](https://buymeacoffee.com/taginside)
 
 ## Use Cases
 
