@@ -41,7 +41,7 @@ The module is functional and ready to use in a standard MagicMirror² environmen
 
 The project is still evolving, especially in terms of UI improvements, advanced display options, and visual customization.
 
-You can support my work here -> <a href="https://buymeacoffee.com/taginside"><img src="thumbnails/bmc_qr.png" alt="Buy me a coffee" width="20"></a>
+You can support my work here -> <a href="https://buymeacoffee.com/taginside"><img src="thumbnails/bmc_qr.png" alt="Buy me a coffee" width="100"></a>
 
 ## Compatibility
 
