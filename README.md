@@ -126,10 +126,7 @@ git pull
 npm ci
 ```
 
-Then restart MagicMirror².
-
-You can support my work here -> <img src="thumbnails/bmc_qr.png" alt="Buy me a coffee" width="100">
-[Buymeacoffee](https://buymeacoffee.com/taginside)
+Then restart MagicMirror². Tada !
 
 ## Use Cases
 
