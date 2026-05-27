@@ -1,129 +1,146 @@
-# Bambulink Module for MagicMirror
+# Bambulink Module for MagicMirror [![GitHub license](https://img.shields.io/badge/license-MIT-blue.svg?style=flat)](https://raw.githubusercontent.com/TAGinside/MMM-Bambulink/main/LICENSE)
 Module: MMM-Bambulink
 
-This [MagicMirror](https://github.com/MichMich/MagicMirror) module,
+This [MagicMirror](https://github.com/MagicMirrorOrg/MagicMirror) module,
 
-MMM-Bambulink is a third-party module for MagicMirror² designed to display information about your Bambu Lab printer directly on your MagicMirror screen. The module connects to your printer over the local network using Bambu Lab’s LAN credentials and updates information automatically at a configurable interval. 
+MMM-Bambulink is a third-party module for MagicMirror² designed to display information about your Bambu Lab printer directly on your MagicMirror screen. The module connects to your printer over the local network using Bambu Lab’s LAN credentials and updates information automatically at a configurable interval.
 
-**NOT NEED ONLY LAN MODE**
+> **Important: ONLY LAN mode NOT must be enabled on the printer.**
 
-![Example.png](thumbnails/Example-1.png) 
+![example.png](thumbnails/example.png)
 
-## Key Requirements
-To use this module, you need:
+## Requirements
 
-* The IP address of your Bambu Lab printer (for local discovery/communication)
-* The LAN connection code (access code) for your printer
-* The serial number of your printer
+To use this module, you need the following information:
 
-These three values are required in the configuration to establish the connection to your printer.
+- The IP address of your Bambu Lab printer
+- The printer’s LAN Access Code
+- The printer serial number
+
+These three values are required in the configuration to establish the connection with your printer. MagicMirror² documentation recommends clearly listing required external dependencies and setup information in a module README. 
 
 ## Key Features
 
-* Monitor your Bambu Lab printer directly from MagicMirror²
-* Secure LAN connection via MQTT/TLS on port 8883
-* NOT NEED "ONLY LAN" MODE - you can use Bambu Cloud
-* Configurable refresh interval for real-time updates
-* Simple installation within the standard MagicMirror module structure
-* Optional thumbnail display for the current print
-* Customizable thumbnail path for printer-specific previews
+- Monitor your Bambu Lab printer directly from MagicMirror². 
+- Secure local connection using **MQTT/TLS** on port **8883**.
+- Configurable refresh interval for automatic updates.
+- Custom printer title using the `printerModel` option.
+- Two temperature display modes:
+  - **tile view** (`tiles`)
+  - **graph view** (`graph`)
+- Visual **AMS** display including:
+  - AMS temperature,
+  - filament color,
+  - loaded filament type for each slot.
+- Automatic highlight of the **active AMS slot** during printing, including when the printer switches filament. Bambu’s AMS workflow is built around slot-based filament selection and color mapping, which makes this type of visual highlighting consistent with how AMS data is handled in local workflows. 
+- Simple installation inside the standard MagicMirror² module structure. 
 
 ## Development Status
-The module is functional and ready for use in a standard MagicMirror² environment, with installation steps, Node.js dependencies, and an update procedure clearly documented in the README. Actually UX is in construction.
 
-The current README is concise and focuses on core setup; detailed feature listings, supported printer states, error handling, and advanced views are not yet fully documented, suggesting the project is still evolving.
+The module is functional and ready to use in a standard MagicMirror² environment. Installation, Node.js dependencies, configuration, and update steps follow the usual module workflow inside `~/MagicMirror/modules`, which is the standard location for third-party MagicMirror² modules. 
+
+The project is still evolving, especially in terms of UI improvements, advanced display options, and visual customization.
+
+You can support my work here -> <a href="https://buymeacoffee.com/taginside"><img src="thumbnails/bmc_qr.png" alt="Buy me a coffee" width="100"></a>
 
 ## Compatibility
-MMM-Bambulink is designed for MagicMirror², as installation requires cloning into ~/MagicMirror/modules and adding configuration to config/config.js.
 
-The required parameters (ip, accessCode, serial, mqttPort, useTLS) indicate it targets Bambu Lab printers with LAN mode enabled and MQTT access over a secure tunnel.
+MMM-Bambulink is designed for **MagicMirror²** and **Bambu Lab printers** without **LAN mode enabled**.
 
-# Installation
-Navigate into your MagicMirror’s modules folder:
-```
+The required parameters such as `ip`, `accessCode`, `serial`, `mqttPort`, and `useTLS` indicate that the module is intended to communicate with the printer locally through a secure network connection. 
+
+## Installation
+
+Go to your MagicMirror `modules` directory:
+
+```bash
 cd ~/MagicMirror/modules
 ```
+
 Clone the repository:
-```
+
+```bash
 git clone https://github.com/TAGinside/MMM-Bambulink
 ```
-Navigate into the new MMM-Bambulink folder:
 
-```
+Enter the module directory:
+
+```bash
 cd MMM-Bambulink
 ```
-Install the Node dependencies:
 
-```
+Install the Node.js dependencies:
+
+```bash
 npm install
 ```
-# Configuration
-Add the module to the modules array in your config/config.js:
 
-```
-modules: [
+
+## Configuration
+
+Add the module to the `modules` array in your `config/config.js` file:
+
+```javascript
   {
-  module: "MMM-Bambulink",
-  position: "top_left",
-  config: {
-    ip: "192.168.1.x",			  // IP address of the printer
-    accessCode: "xxxxxxxx",	  // LAN Connection Code
-    serial: "XXXXXXXX",		    // Serial number of the printer
-	  updateInterval: 5000,			// Refeshtime in ms
-    printerModel: "H2S",      // Printer model (H2S, A1, P2S, or Name)
-	temperatureDisplayMode: "tiles", // "tiles" or "graph"
+    module: "MMM-Bambulink",
+    position: "top_left",
+    config: {
+      ip: "192.168.1.x",                // Printer IP address
+      accessCode: "xxxxxxxx",           // LAN Access Code
+      serial: "XXXXXXXX",               // Printer serial number
+      updateInterval: 5000,             // Refresh interval in ms
 
-    display: {
-      scale: 1,
-      width: 320,
-      graphMinutes: 1
-    },
+      printerModel: "H2S",              // Displayed printer name or model
+      temperatureDisplayMode: "tiles",  // "tiles" or "graph"
 
-    temperatureColors: {
-      nozzle: "#ff4d4f",			// Red
-      bed: "#ff9f1a",				  // Orange
-      chamber: "#4da3ff"			// Blue
+      display: {
+        scale: 1,
+        width: 320,
+        graphMinutes: 1
+      },
+
+      temperatureColors: {
+        nozzle: "#ff4d4f",              // Red
+        bed: "#ff9f1a",                 // Orange
+        chamber: "#4da3ff"              // Blue
+      }
     }
-  }
-},
-]
+  },
 ```
-## How to Use the Module
-To use this module, add it to the modules array in your config/config.js file as shown above, then restart MagicMirror.
 
-Once running, the module will display Bambu Lab printer information in the chosen position (e.g., top_left) on your MagicMirror.
+MagicMirror² modules are configured through `config/config.js`, where each module is added to the `modules` array with its own `config` object.
 
-## Options
-you can choose temps colors
-temperatureColors:
+## How to Use
 
-// "tiles" or "graph"
+After adding the module to `config/config.js`, restart MagicMirror².
 
-// Printer model (H2S, A1, P2S, or Name)
+Once running, the module will display your Bambu Lab printer information in the selected MagicMirror position, such as `top_left`, using the temperature display mode you configured.
 
-    display: {
-      scale: 1,
-      width: 320,
+## Update
 
-# Update
-```
+To update the module:
+
+```bash
 cd ~/MagicMirror/modules/MMM-Bambulink
 git pull
 npm ci
 ```
-After updating, restart MagicMirror.
 
-Use Cases
-This module is particularly useful in a workshop, technical office, or home lab where a MagicMirror already serves as a central dashboard.
+Then restart MagicMirror². Tada !
 
-With this display, you can quickly monitor a print in progress, verify that the printer is responsive, or keep a visual overview of the current job without constantly opening Bambu Studio.
+## Use Cases
 
-About
-MMM-Bambulink brings Bambu Lab printer monitoring directly to your smart mirror, allowing you to integrate 3D print status into a broader home automation or workshop dashboard.
+MMM-Bambulink is especially useful in:
 
-This module is open source and free to use and modify. For more information, updates, or to contribute, visit the GitHub repository:
-https://github.com/TAGinside/MMM-Bambulink
+- a workshop,
+- a technical office,
+- a home lab,
+- a smart home dashboard centered around MagicMirror².
 
-If you try this module, let me know if it works with your printer and MagicMirror setup. Feedback and suggestions are welcome to help shape its future
+It allows you to quickly monitor an active print, confirm that the printer is responding, and keep a live visual overview of the current job without constantly opening Bambu Studio.
 
-# UX IN CONSTRUCTION
+## About
+
+The module is open source and free to use and modify.
+
+Feedback is always welcome, especially for printer compatibility, AMS behavior, and display improvements.
