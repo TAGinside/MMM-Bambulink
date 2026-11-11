@@ -37,6 +37,8 @@ Module.register("MMM-Bambulink", {
     mqttPort: 8883,
     useTLS: true,
     updateInterval: 5000, // ms
+    // Délai sans données après lequel l'imprimante est considérée hors ligne (ms)
+    offlineTimeout: 60000,
 
     // Mode d'affichage des températures :
     // "tiles" = affiche Buse / Lit / Chambre
@@ -79,6 +81,8 @@ Module.register("MMM-Bambulink", {
   start: function () {
     this.printerStatus = null;
     this.loaded = false;
+    this.connectionState = "connecting";
+    this.lastMessageAt = null;
 
     this.lastKnownTemps = {
       nozzle: null,
@@ -600,6 +604,20 @@ Module.register("MMM-Bambulink", {
       return wrapper;
     }
 
+    if (this.connectionState === "offline") {
+      wrapper.innerHTML = "Bambulab : imprimante hors ligne";
+      if (this.lastMessageAt) {
+        const last = new Date(this.lastMessageAt);
+        const hh = String(last.getHours()).padStart(2, "0");
+        const mm = String(last.getMinutes()).padStart(2, "0");
+        const meta = document.createElement("div");
+        meta.className = "bambu-offline-meta";
+        meta.textContent = `Dernière donnée reçue à ${hh}:${mm}`;
+        wrapper.appendChild(meta);
+      }
+      return wrapper;
+    }
+
     if (!this.loaded || !this.printerStatus) {
       wrapper.innerHTML = "Bambulab: connexion en cours…";
       return wrapper;
@@ -870,12 +888,23 @@ Module.register("MMM-Bambulink", {
   socketNotificationReceived: function (notification, payload) {
     if (notification === "BAMBULINK_STATUS") {
       this.loaded = true;
+      this.connectionState = "online";
+      this.lastMessageAt = Date.now();
       this.printerStatus = payload || {};
 
       // Historise les températures pour alimenter le graphe
       this.addTemperatureSnapshot(this.printerStatus);
 
       this.updateDom(300);
+    } else if (notification === "BAMBULINK_CONNECTION") {
+      const state = (payload && payload.state) || "connecting";
+      if (payload && payload.lastMessageAt) {
+        this.lastMessageAt = payload.lastMessageAt;
+      }
+      if (state !== this.connectionState) {
+        this.connectionState = state;
+        this.updateDom(300);
+      }
     }
   }
 });

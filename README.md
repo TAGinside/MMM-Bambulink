@@ -89,6 +89,7 @@ Add the module to the `modules` array in your `config/config.js` file:
       accessCode: "xxxxxxxx",           // LAN Access Code
       serial: "XXXXXXXX",               // Printer serial number
       updateInterval: 5000,             // Refresh interval in ms
+      offlineTimeout: 60000,            // No data for this long (ms) => "printer offline"
 
       printerModel: "H2S",              // Displayed printer name or model
       temperatureDisplayMode: "tiles",  // "tiles" or "graph"

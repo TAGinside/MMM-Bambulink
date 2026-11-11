@@ -11,6 +11,9 @@ module.exports = NodeHelper.create({
   start: function () {
     this.config = null;
     this.client = null;
+    this.connectionState = "connecting";
+    this.lastMessageAt = null;
+    this.watchdog = null;
     this.log("MMM-Bambulink helper started");
   },
 
@@ -19,6 +22,7 @@ module.exports = NodeHelper.create({
   },
 
   stop: function () {
+    this.stopWatchdog();
     if (this.client) {
       this.client.end(true);
       this.client = null;
@@ -30,11 +34,63 @@ module.exports = NodeHelper.create({
       this.config = payload;
       this.connectMqtt();
     } else if (notification === "BAMBULINK_REQUEST_STATUS") {
-      // Rien à faire : l'imprimante envoie déjà ses statuts en continu via MQTT.
+      // L'imprimante envoie ses statuts en continu via MQTT ; on renvoie
+      // simplement l'état de connexion courant (utile après un rechargement du front).
+      this.sendConnectionState();
     }
   },
 
-  connectMqtt: function () {
+  // Met à jour et diffuse l'état de connexion : "connecting" | "online" | "offline"
+  setConnectionState: function (state, reason) {
+    const changed = (this.connectionState !== state);
+    this.connectionState = state;
+    if (changed) {
+      this.log(`Etat connexion: ${state}${reason ? " (" + reason + ")" : ""}`);
+    }
+    this.sendConnectionState(reason);
+  },
+
+  sendConnectionState: function (reason) {
+    this.sendSocketNotification("BAMBULINK_CONNECTION", {
+      state: this.connectionState,
+      reason: reason || null,
+      lastMessageAt: this.lastMessageAt
+    });
+  },
+
+  // Une imprimante éteinte ne ferme pas toujours proprement la connexion TCP :
+  // si aucun message n'arrive pendant offlineTimeout, on la considère hors ligne.
+  startWatchdog: function () {
+    this.stopWatchdog();
+    const self = this;
+    const timeout = Number(this.config.offlineTimeout) || 60000;
+    this.watchdog = setInterval(function () {
+      if (self.connectionState === "online" && self.lastMessageAt &&
+          Date.now() - self.lastMessageAt > timeout) {
+        self.setConnectionState("offline", "aucune donnée reçue");
+        // Force une reconnexion propre.
+        self.connectMqtt(true);
+      }
+    }, 5000);
+  },
+
+  stopWatchdog: function () {
+    if (this.watchdog) {
+      clearInterval(this.watchdog);
+      this.watchdog = null;
+    }
+  },
+
+  requestFullStatus: function () {
+    if (!this.client || !this.client.connected) return;
+    const topic = `device/${this.config.serial}/request`;
+    const payload = JSON.stringify({
+      pushing: { sequence_id: String(Date.now()), command: "pushall" }
+    });
+    this.client.publish(topic, payload);
+  },
+
+  connectMqtt: function (keepState) {
     if (!this.config || !this.config.ip || !this.config.accessCode || !this.config.serial) {
       this.log("Configuration incomplète pour MQTT");
       return;
@@ -56,41 +112,80 @@ module.exports = NodeHelper.create({
     const options = {
       username: "bblp",
       password: this.config.accessCode,
-      rejectUnauthorized: false
+      rejectUnauthorized: false,
+      keepalive: 30,          // détecte plus vite une imprimante éteinte
+      connectTimeout: 10000,  // échec de connexion après 10 s
+      reconnectPeriod: 10000  // nouvelle tentative toutes les 10 s
     };
 
     this.log(`Connexion MQTT à ${url}`);
-    this.client = mqtt.connect(url, options);
+    if (!keepState) {
+      this.setConnectionState("connecting");
+    }
+    const client = mqtt.connect(url, options);
+    this.client = client;
 
     const self = this;
+    // Ignore les événements d'un ancien client remplacé par une reconnexion.
+    const isCurrent = function () { return self.client === client; };
+    this.startWatchdog();
 
-    this.client.on("connect", function () {
+    client.on("connect", function () {
+      if (!isCurrent()) return;
       self.log("Connecté au broker MQTT Bambu");
+      self.lastMessageAt = Date.now();
 
       const topic = `device/${self.config.serial}/report`;
-      self.client.subscribe(topic, function (err) {
+      client.subscribe(topic, function (err) {
         if (err) {
           self.log("Erreur abonnement topic: " + err);
         } else {
           self.log("Abonné au topic: " + topic);
+          // Demande un état complet pour ne pas attendre le prochain rapport.
+          self.requestFullStatus();
         }
       });
     });
 
-    this.client.on("error", function (err) {
+    client.on("error", function (err) {
+      if (!isCurrent()) return;
       self.log("Erreur MQTT: " + err);
+      self.setConnectionState("offline", err && err.message ? err.message : String(err));
     });
 
-    this.client.on("close", function () {
+    client.on("close", function () {
+      if (!isCurrent()) return;
       self.log("Connexion MQTT fermée");
+      self.setConnectionState("offline", "connexion fermée");
     });
 
-    this.client.on("message", function (topic, message) {
+    client.on("offline", function () {
+      if (!isCurrent()) return;
+      self.setConnectionState("offline", "imprimante injoignable");
+    });
+
+    client.on("reconnect", function () {
+      if (!isCurrent()) return;
+      self.log("Tentative de reconnexion MQTT…");
+    });
+
+    client.on("message", function (topic, message) {
+      if (!isCurrent()) return;
       let json;
       try {
         json = JSON.parse(message.toString());
       } catch (e) {
         self.log("JSON invalide reçu: " + e);
+        return;
+      }
+
+      self.lastMessageAt = Date.now();
+      if (self.connectionState !== "online") {
+        self.setConnectionState("online");
+      }
+
+      // Certains messages (réponses aux commandes, info…) ne contiennent pas de bloc "print".
+      if (!json || !json.print) {
         return;
       }
 
