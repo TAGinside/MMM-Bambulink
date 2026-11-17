@@ -272,6 +272,11 @@
   gap: 8px;
 }
 
+/* AMS HT : un seul emplacement, sur toute la largeur */
+.mmm-bambulink .bambu-ams-slots-grid.is-single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .mmm-bambulink .bambu-ams-slot {
   display: flex;
   flex-direction: column;

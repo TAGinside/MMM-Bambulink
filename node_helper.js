@@ -7,103 +7,236 @@
 const NodeHelper = require("node_helper");
 const mqtt = require("mqtt");
 
+// Intervalle minimal entre deux demandes d'état complet ("pushall").
+// Les imprimantes (surtout les P1) ralentissent si on les sollicite trop souvent.
+const MIN_PUSHALL_INTERVAL = 60 * 1000;
+const DEFAULT_PUSHALL_INTERVAL = 5 * 60 * 1000;
+
+// Valeurs spéciales de "tray_now" dans le rapport AMS.
+const TRAY_EXTERNAL = 254; // bobine externe
+const TRAY_NONE = 255;     // aucun filament chargé
+
 module.exports = NodeHelper.create({
   start: function () {
-    this.config = null;
-    this.client = null;
-    this.connectionState = "connecting";
-    this.lastMessageAt = null;
-    this.watchdog = null;
+    // Un seul node_helper est partagé par toutes les instances du module :
+    // chaque instance (une par imprimante) a donc sa propre "session",
+    // indexée par l'identifiant de l'instance.
+    this.sessions = {};
     this.log("MMM-Bambulink helper started");
   },
 
-  log: function (msg) {
-    console.log("MMM-Bambulink:", msg);
+  log: function (msg, session) {
+    const prefix = session ? `MMM-Bambulink [${session.config.serial}]:` : "MMM-Bambulink:";
+    console.log(prefix, msg);
   },
 
   stop: function () {
-    this.stopWatchdog();
-    if (this.client) {
-      this.client.end(true);
-      this.client = null;
-    }
+    const self = this;
+    Object.keys(this.sessions).forEach(function (id) {
+      self.closeSession(self.sessions[id]);
+    });
+    this.sessions = {};
   },
 
   socketNotificationReceived: function (notification, payload) {
-    if (notification === "BAMBULINK_CONFIG") {
-      this.config = payload;
-      this.connectMqtt();
-    } else if (notification === "BAMBULINK_REQUEST_STATUS") {
-      // L'imprimante envoie ses statuts en continu via MQTT ; on renvoie
-      // simplement l'état de connexion courant (utile après un rechargement du front).
-      this.sendConnectionState();
+    // Une exception non attrapée ici ferait tomber tout le serveur MagicMirror.
+    try {
+      const identifier = payload && payload.identifier;
+      if (!identifier) {
+        this.log(`Notification ${notification} sans identifiant ignorée`);
+        return;
+      }
+
+      if (notification === "BAMBULINK_CONFIG") {
+        this.openSession(identifier, payload.config || {});
+        return;
+      }
+
+      const session = this.sessions[identifier];
+      if (!session) {
+        return;
+      }
+
+      if (notification === "BAMBULINK_REQUEST_STATUS") {
+        // L'imprimante envoie ses statuts en continu via MQTT ; on renvoie
+        // simplement l'état de connexion courant (utile après un rechargement du front).
+        this.sendConnectionState(session);
+      } else if (notification === "BAMBULINK_SUSPEND") {
+        // Module masqué : on garde la connexion (le graphe continue de se remplir)
+        // mais on arrête de solliciter l'imprimante.
+        session.suspended = true;
+        this.stopPushallTimer(session);
+      } else if (notification === "BAMBULINK_RESUME") {
+        session.suspended = false;
+        this.requestFullStatus(session);
+        this.startPushallTimer(session);
+      }
+    } catch (e) {
+      this.log("Erreur inattendue (" + notification + "): " + (e && e.stack ? e.stack : e));
     }
   },
 
-  // Met à jour et diffuse l'état de connexion : "connecting" | "online" | "offline"
-  setConnectionState: function (state, reason) {
-    const changed = (this.connectionState !== state);
-    this.connectionState = state;
+  // ---------------------------------------------------------------------------
+  // Sessions (une par instance du module)
+  // ---------------------------------------------------------------------------
+
+  openSession: function (identifier, config) {
+    // Rechargement du front : la même instance renvoie sa config, on repart à zéro.
+    if (this.sessions[identifier]) {
+      this.closeSession(this.sessions[identifier]);
+    }
+
+    const session = {
+      identifier: identifier,
+      config: config,
+      client: null,
+      connectionState: "connecting",
+      lastMessageAt: null,
+      watchdog: null,
+      pushallTimer: null,
+      suspended: false,
+      // Copie cumulée du bloc "print" : les P1 / A1 n'envoient que les champs
+      // modifiés, l'état complet n'arrive qu'en réponse à un "pushall".
+      printCache: {}
+    };
+    this.sessions[identifier] = session;
+    this.connectMqtt(session);
+  },
+
+  closeSession: function (session) {
+    this.stopWatchdog(session);
+    this.stopPushallTimer(session);
+    if (session.client) {
+      try {
+        session.client.end(true);
+      } catch (e) {
+        this.log("Erreur à la fermeture MQTT: " + e, session);
+      }
+      session.client = null;
+    }
+  },
+
+  // ---------------------------------------------------------------------------
+  // État de connexion : "connecting" | "online" | "offline"
+  // ---------------------------------------------------------------------------
+
+  setConnectionState: function (session, state, reason) {
+    const changed = (session.connectionState !== state);
+    session.connectionState = state;
     if (changed) {
-      this.log(`Etat connexion: ${state}${reason ? " (" + reason + ")" : ""}`);
+      this.log(`Etat connexion: ${state}${reason ? " (" + reason + ")" : ""}`, session);
     }
-    this.sendConnectionState(reason);
+    this.sendConnectionState(session, reason);
   },
 
-  sendConnectionState: function (reason) {
+  sendConnectionState: function (session, reason) {
     this.sendSocketNotification("BAMBULINK_CONNECTION", {
-      state: this.connectionState,
+      identifier: session.identifier,
+      state: session.connectionState,
       reason: reason || null,
-      lastMessageAt: this.lastMessageAt
+      lastMessageAt: session.lastMessageAt
     });
   },
 
   // Une imprimante éteinte ne ferme pas toujours proprement la connexion TCP :
   // si aucun message n'arrive pendant offlineTimeout, on la considère hors ligne.
-  startWatchdog: function () {
-    this.stopWatchdog();
+  startWatchdog: function (session) {
+    this.stopWatchdog(session);
     const self = this;
-    const timeout = Number(this.config.offlineTimeout) || 60000;
-    this.watchdog = setInterval(function () {
-      if (self.connectionState === "online" && self.lastMessageAt &&
-          Date.now() - self.lastMessageAt > timeout) {
-        self.setConnectionState("offline", "aucune donnée reçue");
-        // Force une reconnexion propre.
-        self.connectMqtt(true);
+    const timeout = Number(session.config.offlineTimeout) || 60000;
+    session.watchdog = setInterval(function () {
+      try {
+        if (session.connectionState === "online" && session.lastMessageAt &&
+            Date.now() - session.lastMessageAt > timeout) {
+          self.setConnectionState(session, "offline", "aucune donnée reçue");
+          // Force une reconnexion propre.
+          self.connectMqtt(session, true);
+        }
+      } catch (e) {
+        self.log("Erreur watchdog: " + e, session);
       }
     }, 5000);
   },
 
-  stopWatchdog: function () {
-    if (this.watchdog) {
-      clearInterval(this.watchdog);
-      this.watchdog = null;
+  stopWatchdog: function (session) {
+    if (session.watchdog) {
+      clearInterval(session.watchdog);
+      session.watchdog = null;
     }
   },
 
-  requestFullStatus: function () {
-    if (!this.client || !this.client.connected) return;
-    const topic = `device/${this.config.serial}/request`;
-    const payload = JSON.stringify({
-      pushing: { sequence_id: String(Date.now()), command: "pushall" }
-    });
-    this.client.publish(topic, payload);
+  // ---------------------------------------------------------------------------
+  // Demande d'état complet ("pushall")
+  // ---------------------------------------------------------------------------
+
+  // Retourne l'intervalle en ms, ou 0 si désactivé.
+  getPushallInterval: function (session) {
+    const raw = session.config.pushallInterval;
+    if (raw === undefined || raw === null || raw === "") {
+      return DEFAULT_PUSHALL_INTERVAL;
+    }
+    const value = Number(raw);
+    if (isNaN(value) || value <= 0) {
+      return 0;
+    }
+    return Math.max(value, MIN_PUSHALL_INTERVAL);
   },
 
-  connectMqtt: function (keepState) {
-    if (!this.config || !this.config.ip || !this.config.accessCode || !this.config.serial) {
-      this.log("Configuration incomplète pour MQTT");
+  startPushallTimer: function (session) {
+    this.stopPushallTimer(session);
+    const interval = this.getPushallInterval(session);
+    if (!interval || session.suspended) {
+      return;
+    }
+    const self = this;
+    session.pushallTimer = setInterval(function () {
+      self.requestFullStatus(session);
+    }, interval);
+  },
+
+  stopPushallTimer: function (session) {
+    if (session.pushallTimer) {
+      clearInterval(session.pushallTimer);
+      session.pushallTimer = null;
+    }
+  },
+
+  requestFullStatus: function (session) {
+    if (!session.client || !session.client.connected) return;
+    try {
+      const topic = `device/${session.config.serial}/request`;
+      const payload = JSON.stringify({
+        pushing: { sequence_id: String(Date.now()), command: "pushall" }
+      });
+      session.client.publish(topic, payload);
+    } catch (e) {
+      this.log("Erreur envoi pushall: " + e, session);
+    }
+  },
+
+  // ---------------------------------------------------------------------------
+  // Connexion MQTT
+  // ---------------------------------------------------------------------------
+
+  connectMqtt: function (session, keepState) {
+    const config = session.config;
+    if (!config || !config.ip || !config.accessCode || !config.serial) {
+      this.log("Configuration incomplète pour MQTT (ip / accessCode / serial)");
       return;
     }
 
-    if (this.client) {
-      this.client.end(true);
-      this.client = null;
+    if (session.client) {
+      try {
+        session.client.end(true);
+      } catch (e) {
+        this.log("Erreur à la fermeture MQTT: " + e, session);
+      }
+      session.client = null;
     }
 
-    const host = this.config.ip;
-    const port = this.config.mqttPort || 8883;
-    const useTLS = (this.config.useTLS !== false);
+    const host = config.ip;
+    const port = config.mqttPort || 8883;
+    const useTLS = (config.useTLS !== false);
 
     const url = useTLS
       ? `mqtts://${host}:${port}`
@@ -111,87 +244,248 @@ module.exports = NodeHelper.create({
 
     const options = {
       username: "bblp",
-      password: this.config.accessCode,
+      password: config.accessCode,
+      // Les imprimantes Bambu utilisent un certificat auto-signé.
       rejectUnauthorized: false,
       keepalive: 30,          // détecte plus vite une imprimante éteinte
       connectTimeout: 10000,  // échec de connexion après 10 s
       reconnectPeriod: 10000  // nouvelle tentative toutes les 10 s
     };
 
-    this.log(`Connexion MQTT à ${url}`);
+    this.log(`Connexion MQTT à ${url}`, session);
     if (!keepState) {
-      this.setConnectionState("connecting");
+      this.setConnectionState(session, "connecting");
     }
-    const client = mqtt.connect(url, options);
-    this.client = client;
+
+    let client;
+    try {
+      client = mqtt.connect(url, options);
+    } catch (e) {
+      this.setConnectionState(session, "offline", "connexion impossible: " + (e && e.message ? e.message : e));
+      return;
+    }
+    session.client = client;
 
     const self = this;
-    // Ignore les événements d'un ancien client remplacé par une reconnexion.
-    const isCurrent = function () { return self.client === client; };
-    this.startWatchdog();
+    // Ignore les événements d'un ancien client remplacé par une reconnexion
+    // ou d'une session fermée.
+    const isCurrent = function () {
+      return session.client === client && self.sessions[session.identifier] === session;
+    };
+    this.startWatchdog(session);
+    this.startPushallTimer(session);
 
     client.on("connect", function () {
       if (!isCurrent()) return;
-      self.log("Connecté au broker MQTT Bambu");
-      self.lastMessageAt = Date.now();
+      self.log("Connecté au broker MQTT Bambu", session);
+      session.lastMessageAt = Date.now();
 
-      const topic = `device/${self.config.serial}/report`;
+      const topic = `device/${config.serial}/report`;
       client.subscribe(topic, function (err) {
+        if (!isCurrent()) return;
         if (err) {
-          self.log("Erreur abonnement topic: " + err);
+          self.log("Erreur abonnement topic: " + err, session);
         } else {
-          self.log("Abonné au topic: " + topic);
+          self.log("Abonné au topic: " + topic, session);
           // Demande un état complet pour ne pas attendre le prochain rapport.
-          self.requestFullStatus();
+          self.requestFullStatus(session);
         }
       });
     });
 
     client.on("error", function (err) {
       if (!isCurrent()) return;
-      self.log("Erreur MQTT: " + err);
-      self.setConnectionState("offline", err && err.message ? err.message : String(err));
+      self.log("Erreur MQTT: " + err, session);
+      self.setConnectionState(session, "offline", err && err.message ? err.message : String(err));
     });
 
     client.on("close", function () {
       if (!isCurrent()) return;
-      self.log("Connexion MQTT fermée");
-      self.setConnectionState("offline", "connexion fermée");
+      self.log("Connexion MQTT fermée", session);
+      self.setConnectionState(session, "offline", "connexion fermée");
     });
 
     client.on("offline", function () {
       if (!isCurrent()) return;
-      self.setConnectionState("offline", "imprimante injoignable");
+      self.setConnectionState(session, "offline", "imprimante injoignable");
     });
 
     client.on("reconnect", function () {
       if (!isCurrent()) return;
-      self.log("Tentative de reconnexion MQTT…");
+      self.log("Tentative de reconnexion MQTT…", session);
     });
 
     client.on("message", function (topic, message) {
       if (!isCurrent()) return;
-      let json;
       try {
-        json = JSON.parse(message.toString());
+        let json;
+        try {
+          json = JSON.parse(message.toString());
+        } catch (e) {
+          self.log("JSON invalide reçu: " + e, session);
+          return;
+        }
+
+        session.lastMessageAt = Date.now();
+        if (session.connectionState !== "online") {
+          self.setConnectionState(session, "online");
+        }
+
+        // Certains messages (réponses aux commandes, info…) ne contiennent pas de bloc "print".
+        if (!json || !json.print) {
+          return;
+        }
+
+        // Rapports incrémentaux : on fusionne le message dans l'état connu
+        // pour ne pas perdre les champs absents (AMS, couche, températures…).
+        self.mergeDeep(session.printCache, json.print);
+        const status = self.extractStatus({ print: session.printCache });
+        status.identifier = session.identifier;
+        self.sendSocketNotification("BAMBULINK_STATUS", status);
       } catch (e) {
-        self.log("JSON invalide reçu: " + e);
-        return;
+        self.log("Erreur traitement message: " + (e && e.stack ? e.stack : e), session);
       }
-
-      self.lastMessageAt = Date.now();
-      if (self.connectionState !== "online") {
-        self.setConnectionState("online");
-      }
-
-      // Certains messages (réponses aux commandes, info…) ne contiennent pas de bloc "print".
-      if (!json || !json.print) {
-        return;
-      }
-
-      const status = self.extractStatus(json);
-      self.sendSocketNotification("BAMBULINK_STATUS", status);
     });
+  },
+
+  // ---------------------------------------------------------------------------
+  // Fusion des rapports incrémentaux
+  // ---------------------------------------------------------------------------
+
+  isPlainObject: function (value) {
+    return value !== null && typeof value === "object" && !Array.isArray(value);
+  },
+
+  // Fusionne récursivement "source" dans "target" (modifié en place).
+  // Les objets sont fusionnés clé par clé ; les tableaux d'objets portant un
+  // "id" (ams.ams, tray…) sont fusionnés élément par élément selon cet id ;
+  // les autres valeurs (y compris les autres tableaux) remplacent l'ancienne.
+  mergeDeep: function (target, source) {
+    if (!this.isPlainObject(target) || !this.isPlainObject(source)) {
+      return source;
+    }
+    const self = this;
+    Object.keys(source).forEach(function (key) {
+      // Protection contre la pollution de prototype.
+      if (key === "__proto__" || key === "constructor" || key === "prototype") {
+        return;
+      }
+      const incoming = source[key];
+      const current = target[key];
+      if (Array.isArray(incoming)) {
+        target[key] = self.mergeArrayById(current, incoming);
+      } else if (self.isPlainObject(incoming) && self.isPlainObject(current)) {
+        self.mergeDeep(current, incoming);
+      } else {
+        target[key] = incoming;
+      }
+    });
+    return target;
+  },
+
+  // Fusionne deux tableaux d'objets selon leur champ "id".
+  // Si le nouveau tableau ne contient pas que des objets avec un id
+  // (ou s'il est vide), il remplace simplement l'ancien.
+  mergeArrayById: function (current, incoming) {
+    const self = this;
+    const hasId = function (item) {
+      return self.isPlainObject(item) && self.isFilled(item.id);
+    };
+    if (!Array.isArray(current) || incoming.length === 0 || !incoming.every(hasId)) {
+      return incoming;
+    }
+
+    const result = current.slice();
+    incoming.forEach(function (item) {
+      const index = result.findIndex(function (old) {
+        return hasId(old) && String(old.id) === String(item.id);
+      });
+      // Un élément réduit à son id (ex. emplacement AMS vidé) remplace l'ancien
+      // au lieu d'en conserver les anciennes valeurs (type, couleur…).
+      const onlyId = Object.keys(item).length === 1;
+      if (index === -1) {
+        result.push(item);
+      } else if (onlyId || !self.isPlainObject(result[index])) {
+        result[index] = item;
+      } else {
+        self.mergeDeep(result[index], item);
+      }
+    });
+    return result;
+  },
+
+  // ---------------------------------------------------------------------------
+  // Traduction du JSON Bambu
+  // ---------------------------------------------------------------------------
+
+  isFilled: function (value) {
+    return value !== undefined && value !== null && value !== "";
+  },
+
+  // Nom d'un AMS : "AMS 1", "AMS 2"… ou "AMS HT 1" pour les AMS HT (id >= 128).
+  amsLabel: function (amsId) {
+    return (amsId >= 128) ? `AMS HT ${amsId - 127}` : `AMS ${amsId + 1}`;
+  },
+
+  // Nom d'un emplacement, comme dans Bambu Studio : A1…A4, B1…B4, HT1…
+  slotLabel: function (amsId, trayId) {
+    if (amsId >= 128) {
+      return `HT${amsId - 127}`;
+    }
+    const letter = String.fromCharCode(65 + (amsId % 26));
+    return `${letter}${trayId + 1}`;
+  },
+
+  // Numéro global d'un emplacement tel qu'utilisé par "tray_now" :
+  // AMS standard => n° AMS × 4 + n° emplacement ; AMS HT => son propre id.
+  globalTrayIndex: function (amsId, trayId) {
+    return (amsId >= 128) ? amsId : amsId * 4 + trayId;
+  },
+
+  // Liste de tous les AMS avec leurs emplacements.
+  extractAmsUnits: function (amsBlock) {
+    const self = this;
+    if (!amsBlock || !Array.isArray(amsBlock.ams)) {
+      return { units: [], trayNow: null };
+    }
+
+    let trayNow = null;
+    if (this.isFilled(amsBlock.tray_now)) {
+      const n = Number(amsBlock.tray_now);
+      if (!isNaN(n) && n !== TRAY_NONE && n !== TRAY_EXTERNAL) {
+        trayNow = n;
+      }
+    }
+
+    const isObject = function (v) { return v !== null && typeof v === "object"; };
+
+    const units = amsBlock.ams.filter(isObject).map(function (ams, index) {
+      const amsId = self.isFilled(ams.id) && !isNaN(Number(ams.id)) ? Number(ams.id) : index;
+      const trays = Array.isArray(ams.tray) ? ams.tray.filter(isObject) : [];
+
+      const slots = trays.map(function (tray, trayIndex) {
+        const trayId = self.isFilled(tray.id) && !isNaN(Number(tray.id)) ? Number(tray.id) : trayIndex;
+        const globalId = self.globalTrayIndex(amsId, trayId);
+        return {
+          id: trayId,
+          global_id: globalId,
+          label: self.slotLabel(amsId, trayId),
+          tray_type: self.isFilled(tray.tray_type) ? tray.tray_type : "Vide",
+          tray_color: self.isFilled(tray.tray_color) ? tray.tray_color : null,
+          active: (trayNow !== null && globalId === trayNow)
+        };
+      });
+
+      return {
+        id: amsId,
+        label: self.amsLabel(amsId),
+        humidity: self.isFilled(ams.humidity_raw) ? ams.humidity_raw : undefined,
+        temp: self.isFilled(ams.temp) ? ams.temp : undefined,
+        slots: slots
+      };
+    });
+
+    return { units: units, trayNow: trayNow };
   },
 
   // Mappe le JSON Bambu vers un objet simple pour le front.
@@ -225,13 +519,11 @@ module.exports = NodeHelper.create({
       speed_level: p.spd_lvl,
       speed_mag: p.spd_mag,
 
-      // AMS / filament
+      // AMS : tous les AMS connectés, chacun avec ses emplacements
+      ams_units: [],
       ams_tray_now: undefined,
       ams_tray_type: undefined,
       ams_tray_color: undefined,
-      ams_humidity: undefined,
-      ams_temp: undefined,
-      ams_slots: [],
 
       // Température chambre
       chamber_temp: undefined,
@@ -240,50 +532,20 @@ module.exports = NodeHelper.create({
       wifi_signal: p.wifi_signal
     };
 
-    // AMS : slot courant + humidité + température AMS + liste complète des slots
-    if (p.ams && Array.isArray(p.ams.ams) && p.ams.ams.length > 0) {
-      const trayNow = (p.ams.tray_now !== undefined && p.ams.tray_now !== null)
-        ? String(p.ams.tray_now)
-        : null;
+    if (p.ams) {
+      const ams = this.extractAmsUnits(p.ams);
+      status.ams_units = ams.units;
 
-      const ams0 = p.ams.ams[0];
-
-      if (ams0.humidity_raw !== undefined) {
-        status.ams_humidity = ams0.humidity_raw;
-      }
-
-      if (ams0.temp !== undefined) {
-        status.ams_temp = ams0.temp;
-      }
-
-      if (Array.isArray(ams0.tray)) {
-        status.ams_slots = ams0.tray.map(function (tray) {
-          return {
-            id: tray.id,
-            tray_type: (tray.tray_type !== undefined && tray.tray_type !== null && tray.tray_type !== "")
-              ? tray.tray_type
-              : "Vide",
-            tray_color: (tray.tray_color !== undefined && tray.tray_color !== null && tray.tray_color !== "")
-              ? tray.tray_color
-              : null
-          };
-        });
-
-        if (trayNow !== null) {
-          const currentTray = ams0.tray.find(function (t) {
-            return String(t.id) === trayNow;
+      if (ams.trayNow !== null) {
+        status.ams_tray_now = ams.trayNow;
+        ams.units.forEach(function (unit) {
+          unit.slots.forEach(function (slot) {
+            if (slot.active) {
+              status.ams_tray_type = slot.tray_type;
+              status.ams_tray_color = slot.tray_color;
+            }
           });
-
-          if (currentTray) {
-            status.ams_tray_now = currentTray.id;
-            status.ams_tray_type = (currentTray.tray_type !== undefined && currentTray.tray_type !== null && currentTray.tray_type !== "")
-              ? currentTray.tray_type
-              : "Vide";
-            status.ams_tray_color = (currentTray.tray_color !== undefined && currentTray.tray_color !== null && currentTray.tray_color !== "")
-              ? currentTray.tray_color
-              : null;
-          }
-        }
+        });
       }
     }
 

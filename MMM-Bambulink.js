@@ -36,9 +36,14 @@ Module.register("MMM-Bambulink", {
     printerModel: "Bambu Lab",
     mqttPort: 8883,
     useTLS: true,
+    // Vérification de l'état de connexion auprès du node_helper (ms).
+    // Les données de l'imprimante arrivent d'elles-mêmes via MQTT.
     updateInterval: 5000, // ms
     // Délai sans données après lequel l'imprimante est considérée hors ligne (ms)
     offlineTimeout: 60000,
+    // Demande périodique d'un état complet ("pushall") à l'imprimante (ms).
+    // Minimum 60000 (forcé par le node_helper), 0 = désactivé.
+    pushallInterval: 300000,
 
     // Mode d'affichage des températures :
     // "tiles" = affiche Buse / Lit / Chambre
@@ -96,15 +101,47 @@ Module.register("MMM-Bambulink", {
     // Identifiant unique par instance du module
     this.instanceId = "bambulink-" + this.identifier;
 
-    // Envoyer la config au node_helper.
-    this.sendSocketNotification("BAMBULINK_CONFIG", this.config);
+    // Le node_helper est partagé entre toutes les instances (une par imprimante) :
+    // chaque message porte l'identifiant de l'instance.
+    this.sendSocketNotification("BAMBULINK_CONFIG", {
+      identifier: this.identifier,
+      config: this.config
+    });
 
+    this.statusTimer = null;
+    this.startStatusTimer();
+  },
+
+  // Vérifie régulièrement l'état de connexion auprès du node_helper.
+  startStatusTimer: function () {
+    this.stopStatusTimer();
     const self = this;
     if (this.config.updateInterval > 0) {
-      setInterval(function () {
-        self.sendSocketNotification("BAMBULINK_REQUEST_STATUS", {});
+      this.statusTimer = setInterval(function () {
+        self.sendSocketNotification("BAMBULINK_REQUEST_STATUS", { identifier: self.identifier });
       }, this.config.updateInterval);
     }
+  },
+
+  stopStatusTimer: function () {
+    if (this.statusTimer) {
+      clearInterval(this.statusTimer);
+      this.statusTimer = null;
+    }
+  },
+
+  // Module masqué : on arrête les timers et on demande au helper
+  // de ne plus solliciter l'imprimante (la connexion MQTT reste ouverte).
+  suspend: function () {
+    this.stopStatusTimer();
+    this.sendSocketNotification("BAMBULINK_SUSPEND", { identifier: this.identifier });
+  },
+
+  // Module réaffiché : relance des timers et demande d'un état complet.
+  resume: function () {
+    this.sendSocketNotification("BAMBULINK_RESUME", { identifier: this.identifier });
+    this.sendSocketNotification("BAMBULINK_REQUEST_STATUS", { identifier: this.identifier });
+    this.startStatusTimer();
   },
 
   getStyles: function () {
@@ -143,13 +180,56 @@ Module.register("MMM-Bambulink", {
     return `#${hex}`;
   },
 
-  // Retourne un nom d'affichage pour un slot AMS
-  formatSlotName: function (slotId) {
-    const num = Number(slotId);
-    if (!isNaN(num)) {
-      return `Slot ${num + 1}`;
+  // Crée une petite info AMS (humidité, température)
+  createAmsMetaItem: function (label, value) {
+    const item = document.createElement("div");
+    item.className = "bambu-ams-meta-item";
+
+    const itemLabel = document.createElement("div");
+    itemLabel.className = "bambu-ams-meta-label";
+    itemLabel.textContent = label;
+
+    const itemValue = document.createElement("div");
+    itemValue.className = "bambu-ams-meta-value";
+    itemValue.textContent = value;
+
+    item.appendChild(itemLabel);
+    item.appendChild(itemValue);
+    return item;
+  },
+
+  // Crée la carte d'un emplacement AMS (nom, couleur, type de filament)
+  createAmsSlot: function (slot) {
+    const slotCard = document.createElement("div");
+    slotCard.className = "bambu-ams-slot";
+    if (slot.active) {
+      slotCard.classList.add("is-active");
     }
-    return `Slot ${slotId}`;
+
+    const slotHeader = document.createElement("div");
+    slotHeader.className = "bambu-ams-slot-header";
+
+    const slotName = document.createElement("div");
+    slotName.className = "bambu-ams-slot-name";
+    slotName.textContent = slot.label || `Slot ${Number(slot.id) + 1}`;
+
+    const colorBox = document.createElement("span");
+    colorBox.className = "bambu-ams-slot-color";
+    const normalizedColor = this.normalizeTrayColor(slot.tray_color);
+    if (normalizedColor) {
+      colorBox.style.backgroundColor = normalizedColor;
+    }
+
+    slotHeader.appendChild(slotName);
+    slotHeader.appendChild(colorBox);
+
+    const slotType = document.createElement("div");
+    slotType.className = "bambu-ams-slot-type";
+    slotType.textContent = slot.tray_type || "Vide";
+
+    slotCard.appendChild(slotHeader);
+    slotCard.appendChild(slotType);
+    return slotCard;
   },
 
   // Normalise le mode d'affichage des températures
@@ -746,107 +826,46 @@ Module.register("MMM-Bambulink", {
       container.appendChild(temperatureSection);
     }
 
-    // AMS
-    if (
-      s.ams_tray_now !== undefined ||
-      s.ams_humidity !== undefined ||
-      s.ams_temp !== undefined ||
-      (Array.isArray(s.ams_slots) && s.ams_slots.length > 0)
-    ) {
+    // AMS : un bloc par AMS connecté (AMS 1, AMS 2…, AMS HT)
+    const amsUnits = Array.isArray(s.ams_units) ? s.ams_units : [];
+    amsUnits.forEach((unit) => {
       const amsPanel = document.createElement("div");
       amsPanel.className = "bambu-ams-line bambu-panel";
 
       const amsTitle = document.createElement("div");
       amsTitle.className = "bambu-ams-title";
-      amsTitle.textContent = "AMS";
+      // Un seul AMS : titre court "AMS" comme avant.
+      amsTitle.textContent = (amsUnits.length > 1) ? unit.label : "AMS";
       amsPanel.appendChild(amsTitle);
 
       const amsMetaGrid = document.createElement("div");
       amsMetaGrid.className = "bambu-ams-meta-grid";
 
-      if (s.ams_humidity !== undefined && s.ams_humidity !== null && s.ams_humidity !== "") {
-        const humidityItem = document.createElement("div");
-        humidityItem.className = "bambu-ams-meta-item";
-
-        const humidityLabel = document.createElement("div");
-        humidityLabel.className = "bambu-ams-meta-label";
-        humidityLabel.textContent = "Humidité";
-
-        const humidityValue = document.createElement("div");
-        humidityValue.className = "bambu-ams-meta-value";
-        humidityValue.textContent = `${s.ams_humidity}%`;
-
-        humidityItem.appendChild(humidityLabel);
-        humidityItem.appendChild(humidityValue);
-        amsMetaGrid.appendChild(humidityItem);
+      if (unit.humidity !== undefined && unit.humidity !== null && unit.humidity !== "") {
+        amsMetaGrid.appendChild(this.createAmsMetaItem("Humidité", `${unit.humidity}%`));
       }
-
-      if (s.ams_temp !== undefined && s.ams_temp !== null && s.ams_temp !== "") {
-        const tempItem = document.createElement("div");
-        tempItem.className = "bambu-ams-meta-item";
-
-        const tempLabel = document.createElement("div");
-        tempLabel.className = "bambu-ams-meta-label";
-        tempLabel.textContent = "Temp";
-
-        const tempValue = document.createElement("div");
-        tempValue.className = "bambu-ams-meta-value";
-        tempValue.textContent = `${s.ams_temp}°C`;
-
-        tempItem.appendChild(tempLabel);
-        tempItem.appendChild(tempValue);
-        amsMetaGrid.appendChild(tempItem);
+      if (unit.temp !== undefined && unit.temp !== null && unit.temp !== "") {
+        amsMetaGrid.appendChild(this.createAmsMetaItem("Temp", `${unit.temp}°C`));
       }
-
       if (amsMetaGrid.childNodes.length > 0) {
         amsPanel.appendChild(amsMetaGrid);
       }
 
-      if (Array.isArray(s.ams_slots) && s.ams_slots.length > 0) {
+      if (Array.isArray(unit.slots) && unit.slots.length > 0) {
         const slotsGrid = document.createElement("div");
         slotsGrid.className = "bambu-ams-slots-grid";
-
-        s.ams_slots.forEach((slot) => {
-          const slotCard = document.createElement("div");
-          slotCard.className = "bambu-ams-slot";
-
-          if (s.ams_tray_now !== undefined && String(slot.id) === String(s.ams_tray_now)) {
-            slotCard.classList.add("is-active");
-          }
-
-          const slotHeader = document.createElement("div");
-          slotHeader.className = "bambu-ams-slot-header";
-
-          const slotName = document.createElement("div");
-          slotName.className = "bambu-ams-slot-name";
-          slotName.textContent = this.formatSlotName(slot.id);
-
-          const colorBox = document.createElement("span");
-          colorBox.className = "bambu-ams-slot-color";
-
-          const normalizedColor = this.normalizeTrayColor(slot.tray_color);
-          if (normalizedColor) {
-            colorBox.style.backgroundColor = normalizedColor;
-          }
-
-          slotHeader.appendChild(slotName);
-          slotHeader.appendChild(colorBox);
-
-          const slotType = document.createElement("div");
-          slotType.className = "bambu-ams-slot-type";
-          slotType.textContent = slot.tray_type || "Vide";
-
-          slotCard.appendChild(slotHeader);
-          slotCard.appendChild(slotType);
-
-          slotsGrid.appendChild(slotCard);
+        if (unit.slots.length === 1) {
+          // AMS HT : un seul emplacement
+          slotsGrid.classList.add("is-single");
+        }
+        unit.slots.forEach((slot) => {
+          slotsGrid.appendChild(this.createAmsSlot(slot));
         });
-
         amsPanel.appendChild(slotsGrid);
       }
 
       container.appendChild(amsPanel);
-    }
+    });
 
     // Graphe uniquement si le mode demandé est "graph"
     if (temperatureDisplayMode === "graph") {
@@ -886,6 +905,11 @@ Module.register("MMM-Bambulink", {
   },
 
   socketNotificationReceived: function (notification, payload) {
+    // Le node_helper répond à toutes les instances : on ne garde que nos messages.
+    if (!payload || payload.identifier !== this.identifier) {
+      return;
+    }
+
     if (notification === "BAMBULINK_STATUS") {
       this.loaded = true;
       this.connectionState = "online";
@@ -897,8 +921,8 @@ Module.register("MMM-Bambulink", {
 
       this.updateDom(300);
     } else if (notification === "BAMBULINK_CONNECTION") {
-      const state = (payload && payload.state) || "connecting";
-      if (payload && payload.lastMessageAt) {
+      const state = payload.state || "connecting";
+      if (payload.lastMessageAt) {
         this.lastMessageAt = payload.lastMessageAt;
       }
       if (state !== this.connectionState) {
