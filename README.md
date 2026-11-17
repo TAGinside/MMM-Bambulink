@@ -24,6 +24,7 @@ You can find them on the printer screen (network / LAN settings and device infor
 - Monitor your Bambu Lab printer directly from MagicMirror².
 - Secure local connection using **MQTT/TLS** on port **8883**.
 - Real-time updates pushed by the printer, plus a periodic full status request (`pushallInterval`).
+- Support for **incremental reports** (P1 / A1 series and others): partial MQTT messages are merged into the last known state, so the AMS, layer, job name and temperatures stay displayed between two full reports.
 - "Printer offline" message with the time of the last data received when the printer is switched off.
 - Custom printer title using the `printerModel` option.
 - Two temperature display modes:

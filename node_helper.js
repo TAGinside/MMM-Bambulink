@@ -94,7 +94,10 @@ module.exports = NodeHelper.create({
       lastMessageAt: null,
       watchdog: null,
       pushallTimer: null,
-      suspended: false
+      suspended: false,
+      // Copie cumulée du bloc "print" : les P1 / A1 n'envoient que les champs
+      // modifiés, l'état complet n'arrive qu'en réponse à un "pushall".
+      printCache: {}
     };
     this.sessions[identifier] = session;
     this.connectMqtt(session);
@@ -333,13 +336,82 @@ module.exports = NodeHelper.create({
           return;
         }
 
-        const status = self.extractStatus(json);
+        // Rapports incrémentaux : on fusionne le message dans l'état connu
+        // pour ne pas perdre les champs absents (AMS, couche, températures…).
+        self.mergeDeep(session.printCache, json.print);
+        const status = self.extractStatus({ print: session.printCache });
         status.identifier = session.identifier;
         self.sendSocketNotification("BAMBULINK_STATUS", status);
       } catch (e) {
         self.log("Erreur traitement message: " + (e && e.stack ? e.stack : e), session);
       }
     });
+  },
+
+  // ---------------------------------------------------------------------------
+  // Fusion des rapports incrémentaux
+  // ---------------------------------------------------------------------------
+
+  isPlainObject: function (value) {
+    return value !== null && typeof value === "object" && !Array.isArray(value);
+  },
+
+  // Fusionne récursivement "source" dans "target" (modifié en place).
+  // Les objets sont fusionnés clé par clé ; les tableaux d'objets portant un
+  // "id" (ams.ams, tray…) sont fusionnés élément par élément selon cet id ;
+  // les autres valeurs (y compris les autres tableaux) remplacent l'ancienne.
+  mergeDeep: function (target, source) {
+    if (!this.isPlainObject(target) || !this.isPlainObject(source)) {
+      return source;
+    }
+    const self = this;
+    Object.keys(source).forEach(function (key) {
+      // Protection contre la pollution de prototype.
+      if (key === "__proto__" || key === "constructor" || key === "prototype") {
+        return;
+      }
+      const incoming = source[key];
+      const current = target[key];
+      if (Array.isArray(incoming)) {
+        target[key] = self.mergeArrayById(current, incoming);
+      } else if (self.isPlainObject(incoming) && self.isPlainObject(current)) {
+        self.mergeDeep(current, incoming);
+      } else {
+        target[key] = incoming;
+      }
+    });
+    return target;
+  },
+
+  // Fusionne deux tableaux d'objets selon leur champ "id".
+  // Si le nouveau tableau ne contient pas que des objets avec un id
+  // (ou s'il est vide), il remplace simplement l'ancien.
+  mergeArrayById: function (current, incoming) {
+    const self = this;
+    const hasId = function (item) {
+      return self.isPlainObject(item) && self.isFilled(item.id);
+    };
+    if (!Array.isArray(current) || incoming.length === 0 || !incoming.every(hasId)) {
+      return incoming;
+    }
+
+    const result = current.slice();
+    incoming.forEach(function (item) {
+      const index = result.findIndex(function (old) {
+        return hasId(old) && String(old.id) === String(item.id);
+      });
+      // Un élément réduit à son id (ex. emplacement AMS vidé) remplace l'ancien
+      // au lieu d'en conserver les anciennes valeurs (type, couleur…).
+      const onlyId = Object.keys(item).length === 1;
+      if (index === -1) {
+        result.push(item);
+      } else if (onlyId || !self.isPlainObject(result[index])) {
+        result[index] = item;
+      } else {
+        self.mergeDeep(result[index], item);
+      }
+    });
+    return result;
   },
 
   // ---------------------------------------------------------------------------
