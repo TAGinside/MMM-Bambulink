@@ -1,6 +1,6 @@
 {
   "name": "MMM-Bambulink",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "MagicMirror² module to display Bambu Lab printer status via local MQTT.",
   "keywords": [
     "MagicMirror",
@@ -21,7 +21,9 @@
   "license": "MIT",
   "main": "MMM-Bambulink.js",
   "scripts": {
-    "test": "node test/incremental.test.js"
+    "test": "node test/incremental.test.js && node test/frontend.test.js",
+    "check": "node --check node_helper.js && node --check MMM-Bambulink.js && npm test",
+    "snapshot": "git tag -a \"snapshot-$(date +%Y-%m-%d_%H%M)\" -m \"Snapshot $(date '+%Y-%m-%d %H:%M')\""
   },
   "dependencies": {
     "mqtt": "^5.0.0"

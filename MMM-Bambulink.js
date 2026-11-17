@@ -1,6 +1,9 @@
-/* Magic Mirror
- * Module: MMM-Bambulink
+/* MagicMirror²
+ * Module : MMM-Bambulink (front-end)
  */
+
+// Nombre maximal de points conservés pour le graphe des températures.
+const MAX_GRAPH_POINTS = 720;
 
 // Helper : convertit des minutes en "Xj Yh Zm"
 function formatMinutesToDHM(minutes) {
@@ -28,6 +31,10 @@ function speedLevelLabel(level) {
 }
 
 Module.register("MMM-Bambulink", {
+  // Fusion profonde de la config : les sous-options "display" et
+  // "temperatureColors" non renseignées gardent leur valeur par défaut.
+  configDeepMerge: true,
+
   // Configuration par défaut
   defaults: {
     ip: "",
@@ -54,7 +61,6 @@ Module.register("MMM-Bambulink", {
     display: {
       scale: 1,
       width: 320,
-      compact: true,
       graphHeight: 120,
       graphMinutes: 30,
       graphLineWidth: 2,
@@ -67,8 +73,6 @@ Module.register("MMM-Bambulink", {
       sectionGap: 8,
       fontSizes: {
         base: 12,
-        status: 14,
-        meta: 11,
         temperatureValue: 18,
         temperatureTarget: 11,
         graphLabel: 10
@@ -341,9 +345,14 @@ Module.register("MMM-Bambulink", {
       ? sanitized.split("").map(function (char) { return char + char; }).join("")
       : sanitized.substring(0, 6);
 
-    const r = parseInt(full.substring(0, 2), 16) || 255;
-    const g = parseInt(full.substring(2, 4), 16) || 255;
-    const b = parseInt(full.substring(4, 6), 16) || 255;
+    // Composante illisible => 255 (blanc). Attention : 0 est une valeur valide.
+    const channel = function (part) {
+      const n = parseInt(part, 16);
+      return isNaN(n) ? 255 : n;
+    };
+    const r = channel(full.substring(0, 2));
+    const g = channel(full.substring(2, 4));
+    const b = channel(full.substring(4, 6));
 
     return `rgba(${r}, ${g}, ${b}, ${alpha})`;
   },
@@ -360,7 +369,15 @@ Module.register("MMM-Bambulink", {
     ctx.closePath();
   },
 
-  // Ajoute un point dans l'historique local
+  // Durée de la fenêtre du graphe en ms.
+  getGraphWindowMs: function () {
+    const minutes = (this.config.display && this.config.display.graphMinutes) || 30;
+    return minutes * 60 * 1000;
+  },
+
+  // Ajoute un point dans l'historique local.
+  // Les imprimantes envoient jusqu'à un message par seconde : on espace les
+  // points pour que les MAX_GRAPH_POINTS couvrent toute la fenêtre du graphe.
   addTemperatureSnapshot: function (status) {
     const now = Date.now();
 
@@ -378,6 +395,12 @@ Module.register("MMM-Bambulink", {
       this.lastKnownTemps.chamber = chamberValue;
     }
 
+    const minSpacing = this.getGraphWindowMs() / MAX_GRAPH_POINTS;
+    const last = this.temperatureHistory[this.temperatureHistory.length - 1];
+    if (last && now - last.ts < minSpacing) {
+      return;
+    }
+
     this.temperatureHistory.push({
       ts: now,
       nozzle: this.lastKnownTemps.nozzle,
@@ -390,16 +413,14 @@ Module.register("MMM-Bambulink", {
 
   // Garde uniquement les X dernières minutes
   pruneTemperatureHistory: function () {
-    const minutes = (this.config.display && this.config.display.graphMinutes) || 30;
-    const maxAge = minutes * 60 * 1000;
-    const cutoff = Date.now() - maxAge;
+    const cutoff = Date.now() - this.getGraphWindowMs();
 
     this.temperatureHistory = this.temperatureHistory.filter(function (point) {
       return point.ts >= cutoff;
     });
 
-    if (this.temperatureHistory.length > 720) {
-      this.temperatureHistory = this.temperatureHistory.slice(-720);
+    if (this.temperatureHistory.length > MAX_GRAPH_POINTS) {
+      this.temperatureHistory = this.temperatureHistory.slice(-MAX_GRAPH_POINTS);
     }
   },
 
@@ -667,25 +688,19 @@ Module.register("MMM-Bambulink", {
     wrapper.style.setProperty("--bambu-scale", display.scale || 1);
     wrapper.style.setProperty("--bambu-width", `${display.width || 320}px`);
     wrapper.style.setProperty("--bambu-base-font-size", `${fontSizes.base || 12}px`);
-    wrapper.style.setProperty("--bambu-status-font-size", `${fontSizes.status || 14}px`);
-    wrapper.style.setProperty("--bambu-meta-font-size", `${fontSizes.meta || 11}px`);
     wrapper.style.setProperty("--bambu-temp-value-font-size", `${fontSizes.temperatureValue || 18}px`);
     wrapper.style.setProperty("--bambu-temp-target-font-size", `${fontSizes.temperatureTarget || 11}px`);
-    wrapper.style.setProperty("--bambu-graph-label-font-size", `${fontSizes.graphLabel || 10}px`);
     wrapper.style.setProperty("--bambu-radius", `${display.borderRadius || 14}px`);
     wrapper.style.setProperty("--bambu-content-gap", `${display.contentGap || 8}px`);
     wrapper.style.setProperty("--bambu-section-gap", `${display.sectionGap || 8}px`);
-    wrapper.style.setProperty("--bambu-nozzle-color", tempColors.nozzle || "#ff4d4f");
-    wrapper.style.setProperty("--bambu-bed-color", tempColors.bed || "#ff9f1a");
-    wrapper.style.setProperty("--bambu-chamber-color", tempColors.chamber || "#4da3ff");
 
     if (!this.config.ip || !this.config.accessCode || !this.config.serial) {
-      wrapper.innerHTML = "MMM-Bambulink: configuration incomplète (ip / accessCode / serial).";
+      wrapper.textContent = "MMM-Bambulink : configuration incomplète (ip / accessCode / serial).";
       return wrapper;
     }
 
     if (this.connectionState === "offline") {
-      wrapper.innerHTML = "Bambulab : imprimante hors ligne";
+      wrapper.textContent = "Bambu Lab : imprimante hors ligne";
       if (this.lastMessageAt) {
         const last = new Date(this.lastMessageAt);
         const hh = String(last.getHours()).padStart(2, "0");
@@ -699,7 +714,7 @@ Module.register("MMM-Bambulink", {
     }
 
     if (!this.loaded || !this.printerStatus) {
-      wrapper.innerHTML = "Bambulab: connexion en cours…";
+      wrapper.textContent = "Bambu Lab : connexion en cours…";
       return wrapper;
     }
 
@@ -764,7 +779,7 @@ Module.register("MMM-Bambulink", {
     progressBig.textContent = progressValue;
 
     const progressBar = document.createElement("div");
-    progressBar.className = "bambu-progress-bar bambu-progress-bar-bottom";
+    progressBar.className = "bambu-progress-bar";
 
     const progressBarFill = document.createElement("div");
     progressBarFill.className = "bambu-progress-bar-fill";
@@ -919,7 +934,9 @@ Module.register("MMM-Bambulink", {
       // Historise les températures pour alimenter le graphe
       this.addTemperatureSnapshot(this.printerStatus);
 
-      this.updateDom(300);
+      // Pas d'animation : les statuts arrivent jusqu'à une fois par seconde
+      // et un fondu à chaque message ferait clignoter le module.
+      this.updateDom();
     } else if (notification === "BAMBULINK_CONNECTION") {
       const state = payload.state || "connecting";
       if (payload.lastMessageAt) {

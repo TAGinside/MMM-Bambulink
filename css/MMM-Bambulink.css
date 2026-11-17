@@ -2,17 +2,11 @@
   --bambu-scale: 1;
   --bambu-width: 320px;
   --bambu-base-font-size: 12px;
-  --bambu-status-font-size: 14px;
-  --bambu-meta-font-size: 11px;
   --bambu-temp-value-font-size: 18px;
   --bambu-temp-target-font-size: 11px;
-  --bambu-graph-label-font-size: 10px;
   --bambu-radius: 14px;
   --bambu-content-gap: 8px;
   --bambu-section-gap: 8px;
-  --bambu-nozzle-color: #ff4d4f;
-  --bambu-bed-color: #ff9f1a;
-  --bambu-chamber-color: #4da3ff;
 
   width: var(--bambu-width);
   transform: scale(var(--bambu-scale));
@@ -111,10 +105,6 @@
   overflow: hidden;
   background: rgba(255, 255, 255, 0.08);
   box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.35);
-}
-
-.mmm-bambulink .bambu-progress-bar-bottom {
-  margin-top: 0;
 }
 
 .mmm-bambulink .bambu-progress-bar-fill {
@@ -377,19 +367,13 @@
 }
 
 /* ==========================
-   ÉTATS / FALLBACKS
+   HORS LIGNE
    ========================== */
 
-.mmm-bambulink canvas {
-  image-rendering: auto;
-}
-
-.mmm-bambulink .dimmed,
-.mmm-bambulink .xsmall,
-.mmm-bambulink .small,
-.mmm-bambulink .normal,
-.mmm-bambulink .bright {
-  font-size: inherit;
+.mmm-bambulink .bambu-offline-meta {
+  margin-top: 4px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.5);
 }
 
 @media screen and (min-width: 500px) {

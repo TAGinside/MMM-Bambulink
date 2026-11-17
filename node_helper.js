@@ -1,5 +1,5 @@
-/* Magic Mirror
- * Module: MMM-Bambulink
+/* MagicMirror²
+ * Module : MMM-Bambulink (node_helper : connexion MQTT aux imprimantes)
  */
 
 "use strict";

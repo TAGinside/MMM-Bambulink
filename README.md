@@ -100,7 +100,7 @@ Add the module to the `modules` array in your `config/config.js` file:
       display: {
         scale: 1,
         width: 320,
-        graphMinutes: 1
+        graphMinutes: 30
       },
 
       temperatureColors: {
@@ -154,7 +154,6 @@ Add one entry per printer, each with its own `ip`, `accessCode` and `serial`:
 | `temperatureDisplayMode` | `"tiles"` (nozzle / bed / chamber tiles) or `"graph"` (temperature graph). | string | `"tiles"` |
 | `display.scale` | Global zoom of the module. | number | `1` |
 | `display.width` | Module width in pixels. | number | `320` |
-| `display.compact` | Reserved for a future compact layout (not used yet). | boolean | `true` |
 | `display.graphHeight` | Graph height in pixels. | number | `120` |
 | `display.graphMinutes` | Time span of the graph in minutes. | number | `30` |
 | `display.graphLineWidth` | Graph line width in pixels. | number | `2` |
@@ -166,8 +165,6 @@ Add one entry per printer, each with its own `ip`, `accessCode` and `serial`:
 | `display.contentGap` | Space between elements inside the module (px). | number | `8` |
 | `display.sectionGap` | Space between panels (px). | number | `8` |
 | `display.fontSizes.base` | Base font size (px). | number | `12` |
-| `display.fontSizes.status` | Status font size (px). | number | `14` |
-| `display.fontSizes.meta` | Secondary text font size (px). | number | `11` |
 | `display.fontSizes.temperatureValue` | Temperature value font size (px). | number | `18` |
 | `display.fontSizes.temperatureTarget` | Target temperature font size (px). | number | `11` |
 | `display.fontSizes.graphLabel` | Graph axis labels font size (px). | number | `10` |
@@ -199,8 +196,23 @@ Then restart MagicMirror². Tada !
 
 ## Troubleshooting
 
-- **"connexion en cours…" forever / "imprimante hors ligne"**: check the IP address, Access Code and serial number, make sure the printer is on the same network as the Raspberry Pi, and that "LAN Only" mode is disabled.
+- **"Bambu Lab : connexion en cours…" forever / "Bambu Lab : imprimante hors ligne"**: check the IP address, Access Code and serial number, make sure the printer is on the same network as the Raspberry Pi, and that "LAN Only" mode is disabled.
 - Logs are printed by the module helper with the prefix `MMM-Bambulink [serial]:` in the MagicMirror² terminal, or with `pm2 logs` if you run MagicMirror² with pm2.
+
+## Development
+
+Run the syntax checks and the tests (no printer needed: MQTT and MagicMirror are mocked):
+
+```bash
+npm run check
+```
+
+Workflow used for changes:
+
+1. Work locally first.
+2. A change is done when `npm run check` passes and a clear report of the changes is written.
+3. Tag the validated local state with the date and time: `npm run snapshot` (creates the tag `snapshot-YYYY-MM-DD_HHMM`).
+4. Push to GitHub only after validation.
 
 ## Use Cases
 
