@@ -20,6 +20,9 @@
   "author": "TAGinside (https://github.com/TAGinside)",
   "license": "MIT",
   "main": "MMM-Bambulink.js",
+  "scripts": {
+    "test": "node test/incremental.test.js"
+  },
   "dependencies": {
     "mqtt": "^5.0.0"
   }
