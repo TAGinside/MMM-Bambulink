@@ -134,9 +134,13 @@ Add one entry per printer, each with its own `ip`, `accessCode` and `serial`:
   {
     module: "MMM-Bambulink",
     position: "top_right",
-    config: { ip: "192.168.1.11", accessCode: "yyyyyyyy", serial: "YYYYYYYY", printerModel: "P1S" }
+    config: { ip: "192.168.1.11", accessCode: "yyyyyyyy", serial: "YYYYYYYY", printerModel: "P1S", temperatureDisplayMode: "graph" }
   },
 ```
+
+Result with this configuration: on the left an H2S with three AMS (AMS 1, AMS 2 and an AMS HT, active slot B2 highlighted), on the right a P1S with one AMS and the temperature graph (demo data):
+
+![Two printers, several AMS including an AMS HT](thumbnails/demo-multi-printers.png)
 
 ### Options
 
