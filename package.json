@@ -1,6 +1,6 @@
 {
   "name": "MMM-Bambulink",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "MagicMirror² module to display Bambu Lab printer status via local MQTT.",
   "keywords": [
     "MagicMirror",
@@ -12,7 +12,7 @@
   "homepage": "https://github.com/TAGinside/MMM-Bambulink#readme",
   "bugs": {
     "url": "https://github.com/TAGinside/MMM-Bambulink/issues"
-    },
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/TAGinside/MMM-Bambulink.git"
