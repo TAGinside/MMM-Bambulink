@@ -199,21 +199,6 @@ Then restart MagicMirror². Tada !
 - **"Bambu Lab : connexion en cours…" forever / "Bambu Lab : imprimante hors ligne"**: check the IP address, Access Code and serial number, make sure the printer is on the same network as the Raspberry Pi, and that "LAN Only" mode is disabled.
 - Logs are printed by the module helper with the prefix `MMM-Bambulink [serial]:` in the MagicMirror² terminal, or with `pm2 logs` if you run MagicMirror² with pm2.
 
-## Development
-
-Run the syntax checks and the tests (no printer needed: MQTT and MagicMirror are mocked):
-
-```bash
-npm run check
-```
-
-Workflow used for changes:
-
-1. Work locally first.
-2. A change is done when `npm run check` passes and a clear report of the changes is written.
-3. Tag the validated local state with the date and time: `npm run snapshot` (creates the tag `snapshot-YYYY-MM-DD_HHMM`).
-4. Push to GitHub only after validation.
-
 ## Use Cases
 
 MMM-Bambulink is especially useful in:

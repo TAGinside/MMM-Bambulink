@@ -31,10 +31,6 @@ function speedLevelLabel(level) {
 }
 
 Module.register("MMM-Bambulink", {
-  // Fusion profonde de la config : les sous-options "display" et
-  // "temperatureColors" non renseignées gardent leur valeur par défaut.
-  configDeepMerge: true,
-
   // Configuration par défaut
   defaults: {
     ip: "",
@@ -88,6 +84,13 @@ Module.register("MMM-Bambulink", {
   },
 
   start: function () {
+    // MagicMirror ne fusionne que le premier niveau de "config" avec "defaults"
+    // (sauf si "configDeepMerge: true" est mis dans config.js, pas ici) :
+    // sans cela, "display: { width: 400 }" ferait perdre toutes les autres
+    // options d'affichage. On complète donc les sous-options nous-mêmes.
+    this.config.display = this.mergeOptions(this.defaults.display, this.config.display);
+    this.config.temperatureColors = this.mergeOptions(this.defaults.temperatureColors, this.config.temperatureColors);
+
     this.printerStatus = null;
     this.loaded = false;
     this.connectionState = "connecting";
@@ -114,6 +117,23 @@ Module.register("MMM-Bambulink", {
 
     this.statusTimer = null;
     this.startStatusTimer();
+  },
+
+  // Fusion récursive : les clés absentes de "custom" prennent la valeur de
+  // "defaults" (ex. display.fontSizes). Retourne un nouvel objet.
+  mergeOptions: function (defaults, custom) {
+    const isObject = function (v) { return v !== null && typeof v === "object" && !Array.isArray(v); };
+    const result = Object.assign({}, defaults);
+    if (!isObject(custom)) {
+      return result;
+    }
+    const self = this;
+    Object.keys(custom).forEach(function (key) {
+      result[key] = (isObject(defaults[key]) && isObject(custom[key]))
+        ? self.mergeOptions(defaults[key], custom[key])
+        : custom[key];
+    });
+    return result;
   },
 
   // Vérifie régulièrement l'état de connexion auprès du node_helper.
